@@ -1,0 +1,4 @@
+*.ropeproject/
+*.ipynb_checkpoints/
+*.swp
+*.pyc
