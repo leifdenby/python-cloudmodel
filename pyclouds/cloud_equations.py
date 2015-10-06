@@ -3,6 +3,7 @@ Collection of cloud-model equations.
 """
 import odespy
 import warnings
+import numpy as np
 
 # r, w, T, q_v, q_r, q_l, q_i
 class Var:
@@ -215,7 +216,7 @@ class DryAirOnly(CloudModel):
         dTdz_ = self.dTdz(z, r, w, T)
         drdz_ = self.drdz(z, r, w, T, dwdz_, dTdz_)
 
-        return [drdz_, dwdz_, dTdz_, 0., 0., 0., 0.,]
+        return [0.0, drdz_, dwdz_, dTdz_, 0., 0., 0., 0.,]
 
 class CCFM_v0(CloudModel):
     #import ccfm.version0
@@ -261,13 +262,13 @@ class FullThermodynamicsCloudEquations(CloudModel):
     ...
 
     """
-    def __init__(self, gamma, D, beta, rho0, **kwargs):
+    def __init__(self, gamma, D, beta, **kwargs):
         """
         gamma: virtual mass coefficient
         D: drag coefficient
         beta: entrainment coefficient
         """
-        super(self, FullThermodynamicsCloudEquations).__init__(**kwargs)
+        super(FullThermodynamicsCloudEquations, self).__init__(**kwargs)
 
         self.gamma = gamma
         self.D = D
@@ -409,7 +410,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         q_r = F[Var.q_r]
         q_d = 1.0 - q_v - q_l - q_i - q_r
 
-        dFdz_ = np.zeros(F)
+        dFdz_ = np.zeros((8,))
         
 
         # 1. Estimate change in vertical velocity with initial state
