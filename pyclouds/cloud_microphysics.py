@@ -3,8 +3,11 @@ Collection of microphysics routines for use with cloud-model integration.
 """
 import numpy as np
 
-from pyclouds.ccfm.cloudbase import mo_ccfm_cloudbase
-from cloud_equations import Var
+try:
+    from ccfm.ccfmfortran import microphysics as ccfm_microphysics
+except ImportError:
+    # import pure python version instead
+    from ccfm.ccfmpython import microphysics as ccfm_microphysics
 
 
 class MoistAdjustmentMicrophysics(object):
