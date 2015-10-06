@@ -7,21 +7,20 @@ return signature is:
 """
 import numpy as np
 
-from pyclouds.ccfm.cloudbase import mo_ccfm_cloudbase
+try:
+    from ccfm.ccfmfortran import microphysics as ccfm_microphysics
+    import testppp
+except ImportError:
+    # import pure python version instead
+    from ccfm.ccfmpython import microphysics as ccfm_microphysics
 
 def moist_adjustment(T, p, qv):
     """
     Adjust temperature and specific concentration of water vapour to saturation
     point, assuming pressure constants
 
-    Uses `moist_adjust` method from `mo_ccfm_cloudbase.f90`
     """
-
-    # the fortran routine modifies variables in place, we don't want that
-    T_new = np.array(T)
-    qv_new = np.array(qv)
-
-    mo_ccfm_cloudbase.moist_adjust(tem=T_new, prs=p, q_v=qv_new)
+    T_new, qv_new = ccfm_microphysics.moist_adjust(tem=T, prs=p, q_v=qv)
 
     dq_v = qv_new - qv
     dq_l = qv - qv_new

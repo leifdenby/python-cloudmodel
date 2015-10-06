@@ -4,8 +4,6 @@ Collection of cloud-model equations.
 import odespy
 import warnings
 
-import ccfm.version0
-
 # r, w, T, q_v, q_r, q_l, q_i
 class Var:
     r = 0
@@ -195,6 +193,8 @@ class DryAirOnly(CloudModel):
         return [drdz_, dwdz_, dTdz_, 0., 0., 0., 0.,]
 
 class CCFM_v0(CloudModel):
+    #import ccfm.version0
+
     def dFdz(self, F, z):
         raise NotImplemented
 
