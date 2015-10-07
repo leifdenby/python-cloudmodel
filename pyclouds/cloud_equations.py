@@ -16,6 +16,12 @@ class Var:
     q_l = 6
     q_i = 7
 
+    names = ['p', 'r', 'w', 'T', 'q_v', 'q_r', 'q_l', 'q_i']
+
+    @staticmethod
+    def print_formatted(v):
+        print ",\t".join(["%s=%f" % (Var.names[i], v[i]) for i in range(8)])
+
 class VarQ:
     q_v = 0
     q_r = 1
@@ -28,6 +34,7 @@ class CloudModel(object):
 
     def __init__(self, environment, constants, microphysics=None):
         self.microphysics = microphysics
+        self.environment = environment
 
         self.T_e = environment.get('T_e')
         self.p_e = environment.get('p_e')
@@ -53,11 +60,13 @@ class CloudModel(object):
         else:
             return False
 
-    def integrate(self, initial_condition, z, SolverClass=odespy.RKFehlberg):
+    def integrate(self, initial_condition, z, SolverClass=odespy.RKFehlberg, stopping_criterion=None):
         solver = SolverClass(self.dFdz, rtol=0.0, atol=1e-6,)
         solver.set_initial_condition(initial_condition)
 
-        F, z = solver.solve(z, self._stopping_criterion)
+        if stopping_criterion is None:
+            stopping_criterion=self._stopping_criterion
+        F, z = solver.solve(z, stopping_criterion,)
 
         F = F[:-2]
         z = z[:-2]
@@ -216,7 +225,14 @@ class DryAirOnly(CloudModel):
         dTdz_ = self.dTdz(z, r, w, T)
         drdz_ = self.drdz(z, r, w, T, dwdz_, dTdz_)
 
-        return [0.0, drdz_, dwdz_, dTdz_, 0., 0., 0., 0.,]
+        dFdz_ = np.zeros((8,))
+        dFdz_[Var.w] = dwdz_
+        dFdz_[Var.T] = dTdz_
+        dFdz_[Var.r] = drdz_
+
+        Var.print_formatted(dFdz_)
+
+        return dFdz_
 
 class CCFM_v0(CloudModel):
     #import ccfm.version0
@@ -251,6 +267,17 @@ class CCFM_v0(CloudModel):
         return [drdz_, dwdz_, dTdz_, 0., 0., 0., 0.,]
 
 
+# TODO: Move these to some configuration
+R_d = 287.05
+R_v = 461.51
+L_s = 2.8345e6
+L_v = 2.5008e6
+cp_d = 1005.46
+cv_d = 1859.0
+rho_l = 1000.
+rho_i = 500.
+g = 9.80665
+
 class FullThermodynamicsCloudEquations(CloudModel):
     """
     This class represents the full cloud equations where constituents written
@@ -273,6 +300,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         self.gamma = gamma
         self.D = D
         self.beta = beta
+
 
     def _cloud_mixture_density_from_eos(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
         """
@@ -301,14 +329,14 @@ class FullThermodynamicsCloudEquations(CloudModel):
         """
         R_s = (R_v*qv_c + R_d*qd_c)/(qd_c + qv_c)
 
-        return p/(T*R_s)
+        return p/(T_c*R_s)
 
     def dp_dz(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
         rho_c = self._cloud_mixture_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
 
         return -rho_c*g
 
-    def dw_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c):
+    def dw_dz(self, z, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c):
         """
         Momentum equation
 
@@ -319,9 +347,10 @@ class FullThermodynamicsCloudEquations(CloudModel):
         """
         rho_c = self._cloud_mixture_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
 
-        return g/(1.+self.gamma)(rho_c - self.rho0)/rho_c - self.beta/r_c*w_c**2. - self.D*w_c**2./r_c
+        rho0 = self.environment['rho'](z)
+        return g/(1.+self.gamma)*(rho_c - rho0)/rho_c - self.beta/r_c*w_c**2. - self.D*w_c**2./r_c
 
-    def dT_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz):
+    def dT_dz(self, z, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz):
         """
         Constants:
             cp_d: heat capacity of dry air at constant pressure
@@ -342,17 +371,21 @@ class FullThermodynamicsCloudEquations(CloudModel):
         c_cm_p = cp_d*qd_c + cv_d*(qv_c + ql_c + qi_c)
 
         # heat capacity of environment mixture
-        qd_e, qv_e, ql_e, qi_e = self.qd_e, self.qv_e, self.ql_e, self.qi_e
+        # qd_e, qv_e, ql_e, qi_e = self.qd_e, self.qv_e, self.ql_e, self.qi_e
+        # TODO: Allow definition of moist environment
+        qd_e, qv_e, ql_e, qi_e = 1.0, 0.0, 0.0, 0.0
+
         c_em_p = cp_d*qd_e + cv_d*(qv_e + ql_e + qi_e)
 
+        T_e = self.environment['T_e'](z)
         # difference in environment and cloud moist static energy
         Ds = (c_em_p*T_e - ql_e*L_v - qi_e*L_s)\
             -(c_cm_p*T_c - ql_c*L_v - qi_c*L_s)
 
 
-        return  g/c_cm_p + self.beta/r*Ds + Lv/c_cm_p*dql_c__dz + Ls/c_cm_p*dqi_c__dz
+        return  -g/c_cm_p #+ self.beta/r_c*Ds + L_v/c_cm_p*dql_c__dz + L_s/c_cm_p*dqi_c__dz
 
-    def dr_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz):
+    def dr_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, dTc_dz, dw_dz):
         """
         Mass conservation equation
 
@@ -389,14 +422,14 @@ class FullThermodynamicsCloudEquations(CloudModel):
         # in-cloud specific constant of gas constituents
         qg_c = qd_c + qv_c
 
-        return r/2.0*(\
-                        qg_c*rho_c/rho_g * rho_c/rho_cg * g/Rs_c*T_c\
-                        + qg_c*rho_c/rho_g * 1./T_c*dTc_dz\
-                        + rho_c/(rho_cg*Rs_c) * (dqv_c__dz*Rv + dqd_c__dz*Rd)\
-                        + rho_c/rho_i*dqc_i__dz\
-                        + rho_c/rho_l*dqc_l__dz\
-                        + self.beta/r #  1./M*dM_dz\
-                        - 1./w*dw_dz\
+        return r_c/2.0*(\
+                        qg_c*rho_c/rho_cg * rho_c/rho_cg * g/Rs_c*T_c\
+                        + qg_c*rho_c/rho_cg * 1./T_c*dTc_dz\
+                        + rho_c/(rho_cg*Rs_c) * (dqv_c__dz*R_v + dqd_c__dz*R_d)\
+                        + rho_c/rho_i*dqi_c__dz\
+                        + rho_c/rho_l*dql_c__dz\
+                        + self.beta/r_c #  1./M*dM_dz\
+                        - 1./w_c*dw_dz\
                       )
 
     def dFdz(self, F, z):
@@ -414,12 +447,14 @@ class FullThermodynamicsCloudEquations(CloudModel):
         
 
         # 1. Estimate change in vertical velocity with initial state
-        dwdz_ = self.dw_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i)
+        dwdz_ = self.dw_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i)
 
-        dFdz_[Var.w] = dFdz_
+        dFdz_[Var.w] = dwdz_
 
         # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
-        dTdz_s = self.dT_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0)
+        dTdz_s = self.dT_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0)
+
+        print dTdz_s
 
         F_s = np.copy(F)
         F_s[Var.T] += dTdz_s
@@ -428,17 +463,17 @@ class FullThermodynamicsCloudEquations(CloudModel):
         # 3. With new temperature estimate new state from phase changes predicted by microphysics
         F_s = self.microphysics(F_s)
 
-        dTdz_ = F[Var.T] - F_s[Var.T]
+        dTdz_ = F_s[Var.T] - F[Var.T]
         dFdz_[Var.T] = dTdz_
 
-        dql_c__dz = F[Var.q_l] - F_t[Var.q_l]
-        dqi_c__dz = F[Var.q_i] - F_t[Var.q_i]
-        dFdz_[Var.d_v] = - dql_c__dz - dqi_c__dz
-        dFdz_[Var.d_l] = dql_c__dz
-        dFdz_[Var.d_i] = dqi_c__dz
+        dql_c__dz = F_s[Var.q_l] - F[Var.q_l]
+        dqi_c__dz = F_s[Var.q_i] - F[Var.q_i]
+        dFdz_[Var.q_v] = - dql_c__dz - dqi_c__dz
+        dFdz_[Var.q_l] = dql_c__dz
+        dFdz_[Var.q_i] = dqi_c__dz
 
         # 4. Use post microphysics state (and phase changes from microphysics) to estimate radius change
-        drdz_ = self.dr_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=dql_c__dz, dqi_c__dz=dqi_c__dz)
+        drdz_ = self.dr_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=dql_c__dz, dqi_c__dz=dqi_c__dz, dTc_dz=dTdz_, dw_dz=dwdz_)
 
         dFdz_[Var.r] = drdz_
 
@@ -448,4 +483,11 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         dFdz_[Var.p] = dpdz_
 
+        Var.print_formatted(dFdz_)
+
+
         return dFdz_
+
+    def _stopping_criterion(self, F_solution, z, k):
+        print k
+        return k > 5

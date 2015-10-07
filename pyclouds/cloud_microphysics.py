@@ -3,12 +3,23 @@ Collection of microphysics routines for use with cloud-model integration.
 """
 import numpy as np
 
+from pyclouds.cloud_equations import Var
+
 try:
     from ccfm.ccfmfortran import microphysics as ccfm_microphysics
 except ImportError:
     # import pure python version instead
     from ccfm.ccfmpython import microphysics as ccfm_microphysics
 
+
+class DummyMicrophysics(object):
+    """
+    Dummy microphysics implementation that doesn't affect the state at all.
+    """
+
+
+    def __call__(self, F):
+        return F
 
 class MoistAdjustmentMicrophysics(object):
     """
@@ -20,15 +31,15 @@ class MoistAdjustmentMicrophysics(object):
 
 
     def __call__(self, F):
-        # the fortran routine modifies variables in place, we don't want that
-        T_new = np.array(T)
-        qv_new = np.array(qv)
+        T = F[Var.T]
+        qv = F[Var.q_v]
+        p = F[Var.p]
 
-        mo_ccfm_cloudbase.moist_adjust(tem=T_new, prs=p, q_v=qv_new)
+        T_new, qv_new = ccfm_microphysics.moist_adjust(tem=T, prs=p, q_v=qv)
 
         dq_v = qv_new - qv
 
-        Fs = np.copy(F.shape)
+        Fs = np.copy(F)
 
         Fs[Var.q_v] = qv_new
         Fs[Var.q_l] = F[Var.q_l] - dq_v
