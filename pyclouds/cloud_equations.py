@@ -48,10 +48,7 @@ class CloudModel(object):
     def _stopping_criterion(self, F_solution, z, k):
         F_top = F_solution[k]
 
-        if not self.ALLOWS_FREEZING and F_top[Var.T] < 0.0:
-            print "Integration stopped: model does not allow freezing"
-            return True
-        elif F_top[Var.T] > 300.0:
+        if F_top[Var.T] > 300.0:
             print "Integration stopped: temperature got unphysically high"
             return True
         elif F_top[Var.w] < 0.0:
@@ -230,8 +227,6 @@ class DryAirOnly(CloudModel):
         dFdz_[Var.T] = dTdz_
         dFdz_[Var.r] = drdz_
 
-        Var.print_formatted(dFdz_)
-
         return dFdz_
 
 class CCFM_v0(CloudModel):
@@ -348,7 +343,10 @@ class FullThermodynamicsCloudEquations(CloudModel):
         rho_c = self._cloud_mixture_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
 
         rho0 = self.environment['rho'](z)
-        return g/(1.+self.gamma)*(rho_c - rho0)/rho_c - self.beta/r_c*w_c**2. - self.D*w_c**2./r_c
+
+        B = (rho_c - rho0)/rho_c
+
+        return 1.0/w_c * (g/(1.+self.gamma)*B - self.beta/r_c*w_c**2. - self.D*w_c**2./r_c)
 
     def dT_dz(self, z, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz):
         """
@@ -422,8 +420,9 @@ class FullThermodynamicsCloudEquations(CloudModel):
         # in-cloud specific constant of gas constituents
         qg_c = qd_c + qv_c
 
+
         return r_c/2.0*(\
-                        qg_c*rho_c/rho_cg * rho_c/rho_cg * g/Rs_c*T_c\
+                        qg_c*rho_c/rho_cg * rho_c/rho_cg * g/(Rs_c*T_c)\
                         + qg_c*rho_c/rho_cg * 1./T_c*dTc_dz\
                         + rho_c/(rho_cg*Rs_c) * (dqv_c__dz*R_v + dqd_c__dz*R_d)\
                         + rho_c/rho_i*dqi_c__dz\
@@ -454,8 +453,6 @@ class FullThermodynamicsCloudEquations(CloudModel):
         # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
         dTdz_s = self.dT_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0)
 
-        print dTdz_s
-
         F_s = np.copy(F)
         F_s[Var.T] += dTdz_s
 
@@ -483,11 +480,5 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         dFdz_[Var.p] = dpdz_
 
-        Var.print_formatted(dFdz_)
-
 
         return dFdz_
-
-    def _stopping_criterion(self, F_solution, z, k):
-        print k
-        return k > 5

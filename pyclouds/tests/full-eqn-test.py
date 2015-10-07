@@ -52,9 +52,11 @@ stopping_criterion = lambda F, z, k: k > 4
 
 microphysics = cloud_microphysics.DummyMicrophysics()
 
-cloud_model = cloud_equations.DryAirOnly(environment=environment, constants=constants, gamma=1.4, D=1.0, beta=0.2, microphysics=microphysics)
+cloud_model = cloud_equations.DryAirOnly(environment=environment, constants=constants, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics)
 F, z = cloud_model.integrate(initial_condition, z_points, SolverClass=odespy.Euler, stopping_criterion=stopping_criterion)
 
-cloud_model = cloud_equations.FullThermodynamicsCloudEquations(environment=environment, constants=constants, gamma=1.4, D=1.0, beta=0.2, microphysics=microphysics)
+print 
+
+cloud_model = cloud_equations.FullThermodynamicsCloudEquations(environment=environment, constants=constants, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics)
 F, z = cloud_model.integrate(initial_condition, z_points, SolverClass=odespy.Euler, stopping_criterion=stopping_criterion)
 plotting.profile_plot(F, z, Te=T_e)
