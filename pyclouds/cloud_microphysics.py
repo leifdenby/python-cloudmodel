@@ -18,7 +18,7 @@ class DummyMicrophysics(object):
     """
 
 
-    def __call__(self, F):
+    def __call__(self, F, p):
         return F
 
 class MoistAdjustmentMicrophysics(object):
@@ -30,10 +30,9 @@ class MoistAdjustmentMicrophysics(object):
     """
 
 
-    def __call__(self, F):
+    def __call__(self, F, p):
         T = F[Var.T]
         qv = F[Var.q_v]
-        p = F[Var.p]
 
         T_new, qv_new = ccfm_microphysics.moist_adjust(tem=T, prs=p, q_v=qv)
 
@@ -43,5 +42,6 @@ class MoistAdjustmentMicrophysics(object):
 
         Fs[Var.q_v] = qv_new
         Fs[Var.q_l] = F[Var.q_l] - dq_v
+        Fs[Var.T] = T_new
 
         return Fs
