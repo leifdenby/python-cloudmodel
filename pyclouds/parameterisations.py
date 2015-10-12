@@ -1,0 +1,88 @@
+from common import AttrDict
+
+import numpy as np
+
+class BaseParameterisation(object):
+    def __init__(self, constants=None):
+        if constants is None:
+            constants = self.default_constants
+
+        self.constants = AttrDict(constants)
+
+
+class SaturationVapourPressure(BaseParameterisation):
+    default_constants = {
+        "p0vs": 611.2,  # [Pa]
+        "a0_lq": 17.67,
+        "a1_lq": -32.19,
+        "a0_ice": 22.587,
+        "a1_ice": 0.7,
+    }
+
+    CCFM_constants = {
+        'p0vs': 610.78,
+        'a0_lq': 17.269,
+        'a1_lq': 35.86,
+        'a0_ice': 21.875,
+        'a1_ice': 7.66,
+    }
+
+    def pv_sat_liquid(self, T):
+        p0vs = self.constants.p0vs
+        a0_lq = self.constants.a0_lq
+        a1_lq = self.constants.a1_lq
+
+        return p0vs*np.exp((a0_lq*(T-273.15)/(T+a1_lq)))
+
+    def pv_sat_ice(self, T):
+        p0vs = self.constants.p0vs
+        a0_ice = self.constants.a0_ice
+        a1_ice = self.constants.a1_ice
+
+        return p0vs*np.exp((a0_ice*(T-273.15)/(T+a1_ice)))
+
+    def pv_sat(self, T):
+        v = np.zeros(np.array(T).shape)
+
+        if v.shape == ():
+            if T > 273.15:
+                return self.pv_sat_liquid(T)
+            else:
+                return self.pv_sat_ice(T)
+        else:
+            T = np.array(T)
+            idx_liquid = np.array(T) > 273.15
+            idx_ice = idx_liquid == False
+            v[idx_liquid] = self.pv_sat_liquid(T[idx_liquid])
+            v[idx_ice] = self.pv_sat_ice(T[idx_ice])
+            return v
+
+    def __call__(self, T):
+        return self.pv_sat(T)
+
+
+class ThermalExpansionCoefficient(BaseParameterisation):
+    default_constants = {
+        'a': 2.4e-2,
+        'b': 8.0e-5,
+    }
+
+    def __call__(self, T):
+        return self.constants.a*T + self.constants.b
+
+class WaterVapourDiffusionCoefficient(BaseParameterisation):
+    default_constants = {
+        'a': 2.11e-5,
+        'b': 1.94,
+    }
+
+    def __call__(self, T):
+        a = self.constants.a
+        b = self.constants.b
+        T0 = 273.15
+
+        return a*(T/T0)**b
+
+pv_sat = SaturationVapourPressure()
+Ka = ThermalExpansionCoefficient()
+Dv = WaterVapourDiffusionCoefficient()

@@ -70,11 +70,11 @@ def hydrometeor_profile_plot(F, z, Te, p_e):
     plot.grid(True)
 
 
-def plot_profiles(profiles, vars=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram']):
-    if len(vars) > 6:
+def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram']):
+    if len(variables) > 6:
         raise NotImplementedError
 
-    n = len(vars)
+    n = len(variables)
     c = n > 3 and 3 or n
     r = n/c
 
@@ -83,7 +83,7 @@ def plot_profiles(profiles, vars=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram']):
     fig = plot.figure(figsize=(6*c,7*r))
 
     lines = []
-    for n, (v, s) in enumerate(zip(vars, list(gs))):
+    for n, (v, s) in enumerate(zip(variables, list(gs))):
 
         tephigram = None
         if v == 'T__tephigram':
@@ -199,3 +199,52 @@ def plot_profiles(profiles, vars=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram']):
     plot.suptitle("Vertical cloud profiles")
 
     return fig
+
+
+def plot_hydrometeor_evolution(evolutions, variables=['q_v',]):
+    n = len(variables)
+
+    gs = gridspec.GridSpec(n, 1)
+
+    fig = plot.figure(figsize=(12,6*n))
+
+    lines = []
+    for n, (v, s) in enumerate(zip(variables, list(gs))):
+        t_max = 0.
+        data_max = 0.
+        data_min = 1.0e16
+        plot.subplot(s)
+
+        for n_evolution, evolution in enumerate(evolutions):
+            i = Var.names.index(v)
+
+            evolution_data = evolution.F[:,i]
+            lines += plot.plot(evolution.t, evolution_data, label=str(evolution), marker='.', linestyle='',)
+
+            data_max = max(max(evolution_data), data_max)
+            data_min = min(min(evolution_data), data_min)
+            t_max = max(max(evolution.t), t_max)
+
+            if v == 'q_v':
+                plot.ylabel('specific concentration of cloud water [kg/kg]')
+
+                T = evolution.F[:,Var.T]
+                p = evolution.model.p0
+                if hasattr(evolution.model, 'qv_sat'):
+                    q_v__sat = evolution.model.qv_sat(T=T, p=p)
+                    data_min = min(min(q_v__sat), data_min)
+                    data_max = max(max(q_v__sat), data_max)
+                    color = lines[n_evolution].get_color()
+                    plot.plot(evolution.t, q_v__sat, marker='', color=color, label='', linestyle='--')
+            elif v == 'T':
+                plot.ylabel('Temperature [K]')
+
+        d_data = 0.1*(data_max-data_min)
+        d_t = 0.1*t_max
+
+        plot.xlim(-d_t, t_max+d_t)
+        plot.ylim(data_min - d_data, data_max + d_data)
+        plot.xlabel('time [s]')
+        plot.grid(True)
+
+        plot.legend(loc="lower right")
