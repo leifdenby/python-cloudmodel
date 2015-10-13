@@ -235,7 +235,7 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',]):
                     data_min = min(min(q_v__sat), data_min)
                     data_max = max(max(q_v__sat), data_max)
                     color = lines[n_evolution].get_color()
-                    plot.plot(evolution.t, q_v__sat, marker='', color=color, label='', linestyle='--')
+                    plot.plot(evolution.t, q_v__sat, marker='', color=color, label='', linestyle=':')
             elif v == 'T':
                 plot.ylabel('Temperature [K]')
 

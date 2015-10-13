@@ -17,6 +17,8 @@ class SaturationVapourPressure(BaseParameterisation):
         "a1_lq": -32.19,
         "a0_ice": 22.587,
         "a1_ice": 0.7,
+        "R_d": 287.05,
+        "R_v": 461.51,
     }
 
     CCFM_constants = {
@@ -56,6 +58,35 @@ class SaturationVapourPressure(BaseParameterisation):
             v[idx_liquid] = self.pv_sat_liquid(T[idx_liquid])
             v[idx_ice] = self.pv_sat_ice(T[idx_ice])
             return v
+
+    def qv_sat(self, T, p):
+        R_v = self.constants.R_v
+        R_d = self.constants.R_d
+
+        pv_sat = self.pv_sat(T=T)
+        epsilon = R_d/R_v
+        qv_sat = (epsilon*pv_sat)/(p-(1.-epsilon)*pv_sat)
+
+        return qv_sat
+
+    def dpsat_dT(self, T):
+        if T < 273.15:
+            A, B = self.constants.a0_ice, self.constants.a1_ice
+        else:
+            A, B = self.constants.a0_lq, self.constants.a1_lq
+
+        return self.pv_sat(T=T)*A*(273.15-B)/((T-B)**2.)
+
+    def dqv_sat__dT(self, p, T):
+        dpsat_dT = self.dpsat_dT(T=T)
+
+        R_v = self.constants.R_v
+        R_d = self.constants.R_d
+
+        pv_sat = self.pv_sat(T=T)
+
+        return R_d/R_v*p*dpsat_dT/((p-pv_sat)**2.)
+
 
     def __call__(self, T):
         return self.pv_sat(T)

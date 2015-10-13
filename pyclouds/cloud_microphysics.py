@@ -12,23 +12,27 @@ from pyclouds.utils import default_constants
 from pyclouds.plotting import plot_hydrometeor_evolution
 from pyclouds import parameterisations as default_parameterisations
 
-try:
-    from ccfm.ccfmfortran import microphysics as ccfm_microphysics
-except ImportError:
-    # import pure python version instead
-    from ccfm.ccfmpython import microphysics as ccfm_microphysics
+# try:
+    # from ccfm.ccfmfortran import microphysics as ccfm_microphysics
+# except ImportError:
+    # # import pure python version instead
+from ccfm.ccfmpython import microphysics as ccfm_microphysics
 
 class HydrometeorEvolution:
-    def __init__(self, F, t, model):
+    def __init__(self, F, t, model, integration_kwargs={}):
         self.F = F
         self.t = t
         self.model = model
+        self.integration_kwargs = integration_kwargs
 
     def plot(self):
         plot_hydrometeor_evolution([self,])
 
     def __str__(self):
-        return str(self.model)
+        s = str(self.model)
+        if len(self.integration_kwargs) > 0:
+            s += " (%s)" % ", ".join(["%s: %s" % (k, str(v)) for (k, v) in self.integration_kwargs.items()])
+        return s
 
 
 class BaseMicrophysicsModel(object):
@@ -76,7 +80,7 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
     Uses `moist_adjust` method from `mo_ccfm_cloudbase.f90`
     """
 
-    def integrate(self, initial_condition, t, p0, *args, **kwargs):
+    def integrate(self, initial_condition, t, p0, iterations=1, *args, **kwargs):
         """
         Fake integrate method, moist adjustment instantenously turns all supersaturation into condensed water.
         """
@@ -86,37 +90,50 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         F0 = initial_condition
         F = np.zeros((len(t), Var.NUM))
         F[0] = initial_condition
-        F[1:] = self._calc_adjusted_state(F=F0, p=p0)
+        F[1:] = self._calc_adjusted_state(F=F0, p=p0, iterations=iterations)
 
-        return HydrometeorEvolution(F=F, t=t, model=self)
+        return HydrometeorEvolution(F=F, t=t, model=self, integration_kwargs={ 'iterations': iterations, })
 
     def qv_sat(self, T, p):
-        R_v = self.constants.R_v
-        R_d = self.constants.R_d
+        return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
 
-        pv_sat = self.parameterisations.pv_sat(T=T)
-        epsilon = R_d/R_v
-        qv_sat = (epsilon*pv_sat)/(p-(1.-epsilon)*pv_sat)
-
-        return qv_sat
-
-    def _calc_adjusted_state(self, F, p):
+    def _calc_adjusted_state(self, F, p, iterations):
         """
-        Compute the change in F in the time `dt`
+        Calculate approximation saturation state using first-order Taylor
+        expansion of the moist enthalpy equation at constant pressure:
+
+        cp*dT = -L_v*dq
+
+        Following suggestions in notes by Peter Bechtold
         """
+        cp_d = self.constants.cp_d
+        cp_v = self.constants.cp_v
+        L_v = self.constants.L_v
+
+        qv = F[Var.q_v]
+        ql = F[Var.q_l]
+        qr = F[Var.q_r]
+        qi = F[Var.q_i]
+        qd = 1. - qv - ql - qr - qi
 
         T = F[Var.T]
         qv = F[Var.q_v]
 
-        T_new, qv_new = ccfm_microphysics.moist_adjust(tem=T, prs=p, q_v=qv)
+        for n in range(iterations):
+            cp_m = cp_d*qd + (ql + qr + qi + qv)*cp_v
+            qv_sat = self.parameterisations.pv_sat.qv_sat(T=T, p=p)
+            dqv_sat__dT = self.parameterisations.pv_sat.dqv_sat__dT(T=T, p=p)
 
-        dq_v = qv_new - qv
+            dT = L_v/cp_m*(qv - qv_sat)/(1 + L_v/cp_m*dqv_sat__dT)
+
+            T = T+dT
+            qv = qv - cp_m/L_v*dT
+            ql = ql + cp_m/L_v*dT
 
         Fs = np.copy(F)
-
-        Fs[Var.q_v] = qv_new
-        Fs[Var.q_l] = F[Var.q_l] - dq_v
-        Fs[Var.T] = T_new
+        Fs[Var.q_v] = qv
+        Fs[Var.q_l] = ql
+        Fs[Var.T] = T
 
         return Fs
 
@@ -144,14 +161,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         return 1.0/rho_inv
 
     def qv_sat(self, T, p):
-        R_v = self.constants.R_v
-        R_d = self.constants.R_d
-
-        pv_sat = self.parameterisations.pv_sat(T=T)
-        epsilon = R_d/R_v
-        qv_sat = (epsilon*pv_sat)/(p-(1.-epsilon)*pv_sat)
-
-        return qv_sat
+        return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
 
     def dFdt(self, F, t, p):
         rho_l = self.constants.rho_l
