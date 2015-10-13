@@ -201,7 +201,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
     return fig
 
 
-def plot_hydrometeor_evolution(evolutions, variables=['q_v',]):
+def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right'):
     n = len(variables)
 
     gs = gridspec.GridSpec(n, 1)
@@ -216,17 +216,33 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',]):
         plot.subplot(s)
 
         for n_evolution, evolution in enumerate(evolutions):
-            i = Var.names.index(v)
+            try:
+                i = Var.names.index(v)
+                evolution_data = evolution.F[:,i]
+                evolution_time = evolution.t
+            except ValueError:
+                if v in ['Nc', 'r_c', 'r_c__0']:
+                    try:
+                        evolution_data = np.array(evolution.extra_vars[v])
+                        evolution_time = evolution.extra_vars['t_substeps']
 
-            evolution_data = evolution.F[:,i]
-            lines += plot.plot(evolution.t, evolution_data, label=str(evolution), marker='.', linestyle='',)
+                        if v in ['r_c', 'r_c__0']:
+                            evolution_data *= 1.e6
+                    except KeyError:
+                        continue
+                else:
+                    raise Exception("Variable %s not found" % v)
+
+            lines += plot.plot(evolution_time, evolution_data, label=str(evolution), marker='.', linestyle='',)
 
             data_max = max(max(evolution_data), data_max)
             data_min = min(min(evolution_data), data_min)
             t_max = max(max(evolution.t), t_max)
 
-            if v == 'q_v':
+            if v == 'q_l':
                 plot.ylabel('specific concentration of cloud water [kg/kg]')
+            if v == 'q_v':
+                plot.ylabel('specific concentration of water vapour [kg/kg]')
 
                 T = evolution.F[:,Var.T]
                 p = evolution.model.p0
@@ -236,6 +252,10 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',]):
                     data_max = max(max(q_v__sat), data_max)
                     color = lines[n_evolution].get_color()
                     plot.plot(evolution.t, q_v__sat, marker='', color=color, label='', linestyle=':')
+            elif v == 'r_c' or v == 'r_c__0':
+                plot.ylabel('Cloud droplet radius [$\mu m$]')
+            elif v == 'Nc':
+                plot.ylabel(r'Cloud droplet number concention [$m^{-3}$]')
             elif v == 'T':
                 plot.ylabel('Temperature [K]')
 
@@ -247,4 +267,12 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',]):
         plot.xlabel('time [s]')
         plot.grid(True)
 
-        plot.legend(loc="lower right")
+        leg = plot.legend(loc=legend_loc)
+        leg.get_frame().set_alpha(0.8)
+
+
+
+
+
+
+

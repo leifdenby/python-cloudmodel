@@ -19,11 +19,12 @@ from pyclouds import parameterisations as default_parameterisations
 from ccfm.ccfmpython import microphysics as ccfm_microphysics
 
 class HydrometeorEvolution:
-    def __init__(self, F, t, model, integration_kwargs={}):
+    def __init__(self, F, t, model, integration_kwargs={}, extra_vars={}):
         self.F = F
         self.t = t
         self.model = model
         self.integration_kwargs = integration_kwargs
+        self.extra_vars = extra_vars
 
     def plot(self):
         plot_hydrometeor_evolution([self,])
@@ -53,6 +54,7 @@ class BaseMicrophysicsModel(object):
         # When integrating the microphysics on it's own we assume constant
         # pressure which must be provided when integrating
         self.p0 = p0
+        self.extra_vars = {}
         derriv_f = lambda F, t: self.dFdt(F=F, p=p0, t=t)
         solver = SolverClass(derriv_f, rtol=0.0, atol=tolerance,)
         solver.set_initial_condition(initial_condition)
@@ -61,7 +63,7 @@ class BaseMicrophysicsModel(object):
             stopping_criterion=self._stopping_criterion
         F, t = solver.solve(t, stopping_criterion,)
 
-        return HydrometeorEvolution(F=F, t=t, model=self)
+        return HydrometeorEvolution(F=F, t=t, model=self, extra_vars=self.extra_vars,)
 
 class DummyMicrophysics(BaseMicrophysicsModel):
     """
@@ -141,12 +143,12 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         return "Moist adjustment"
 
 class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, r_crit=5.0e-6, *args, **kwargs):
         super(FiniteCondensationTimeMicrophysics, self).__init__(*args, **kwargs)
 
         self.N0 = 200*1.e6  # initial aerosol number concentration [m-3]
         self.r0 = 0.1e-6  # cloud droplet initial radius
-        self.r_crit = 5.0e-6  # critical cloud droplet radius [m] after which the number of cloud droplets is increased
+        self.r_crit = r_crit  # critical cloud droplet radius [m] after which the number of cloud droplets is increased
 
     def _calc_mixture_density(self, qd, qv, ql, qi, qr, p, T):
         warnings.warn("EoS calculation stored within microphysics, should really use something defined externally")
@@ -186,13 +188,14 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         rho_g = self._calc_mixture_density(qd=qd, qv=qv, ql=0., qi=0., qr=0., p=p, T=T)
 
 
-        r_c = (ql*rho/(4./3.*pi*self.N0*rho_l))
+        r_c = (ql*rho/(4./3.*pi*self.N0*rho_l))**(1./3.)
+        r_c__0 = r_c
 
         if r_c > self.r_crit:
             # if cloud droplet radius with initial number of droplets is larger
             # than a critial size assume that instead more droplets are made,
             # all with the critical radius
-            Nc = q_c*rho/(4./3.*pi*rho_l*self.r_crit**3.0)
+            Nc = ql*rho/(4./3.*pi*rho_l*self.r_crit**3.0)
             r_c = self.r_crit
         else:
             Nc = self.N0
@@ -201,11 +204,8 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         # condensation evaporation of cloud droplets (given number of droplets
         # and droplet radius calculated above)
-
-        # TODO: This needs double checking
         Sw = qv/self.qv_sat(T=T, p=p)
 
-        # TODO: move the thermal conductivity of and diffusion through air somewhere else
         Ka = self.parameterisations.Ka(T=T)
         Fk = (Lv/(R_v*T) - 1)*Lv/(Ka*T)
 
@@ -221,9 +221,10 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         dFdz[Var.q_v] = -dqc_dt
         dFdz[Var.T] = Lv/cp_m*dqc_dt
 
-        # print dqc_dt, Sw
-        # import ipdb
-        # ipdb.set_trace()
+        self.extra_vars.setdefault('r_c', []).append(r_c)
+        self.extra_vars.setdefault('r_c__0', []).append(r_c__0)
+        self.extra_vars.setdefault('Nc', []).append(Nc)
+        self.extra_vars.setdefault('t_substeps', []).append(t)
 
         return dFdz
 
@@ -232,4 +233,4 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         pass
 
     def __str__(self):
-        return "Finite condensation time"
+        return "Finite condensation time ($r_{crit}=%gm$)" % (self.r_crit)
