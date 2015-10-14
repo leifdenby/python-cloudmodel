@@ -7,7 +7,7 @@ try:
 except ImportError:
     Tephigram = None
 
-import utils
+import parameterisations
 from common import Var
 
 def profile_plot(F, z, Te):
@@ -48,7 +48,7 @@ def hydrometeor_profile_plot(F, z, Te, p_e):
 
     T = [float(t_) for t_ in T]
 
-    q_v__sat = utils.qv_sat(T=T, p=p)
+    q_v__sat = parameterisations.qv_sat(T=T, p=p)
 
     plot.figure(figsize=(16,6))
     plot.subplot(131)
@@ -105,17 +105,17 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
 
         for n_profile, profile in enumerate(profiles):
             if v == 'mse':
-                profile_data = utils.Utils(profile.cloud_model.constants).moist_static_energy(profile.F, profile.z)/1.e3
-                if n_profile == 0:
-                    def ref_plot_func():
-                        z = profile.z
-                        Te = profile.cloud_model.environment.temp(z)
-                        F_e = np.zeros((profile.F.shape))
-                        F_e[...,Var.T] = Te
-                        environment_mse = utils.Utils(profile.cloud_model.constants).moist_static_energy(F_e, profile.z)/1.e3
-                        return plot.plot(environment_mse, z, marker='', label='environment')
-
-
+                raise NotImplementedError
+                # TODO: Reimplement this, so that it uses mse calculation from model
+                # profile_data = utils.Utils(profile.cloud_model.constants).moist_static_energy(profile.F, profile.z)/1.e3
+                # if n_profile == 0:
+                    # def ref_plot_func():
+                        # z = profile.z
+                        # Te = profile.cloud_model.environment.temp(z)
+                        # F_e = np.zeros((profile.F.shape))
+                        # F_e[...,Var.T] = Te
+                        # environment_mse = utils.Utils(profile.cloud_model.constants).moist_static_energy(F_e, profile.z)/1.e3
+                        # return plot.plot(environment_mse, z, marker='', label='environment')
             elif i == None:
                 raise NotImplementedError("Variable not found")
             else:
@@ -163,7 +163,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     T = profile.F[:,Var.T]
                     z = profile.z
                     p = profile.cloud_model.environment.p(z)
-                    q_v__sat = utils.qv_sat(T=T, p=p)
+                    q_v__sat = parameterisations.pv_sat.qv_sat(T=T, p=p)
                     color = lines[n_profile].get_color()
                     plot.plot(q_v__sat, z, marker='', color=color, label='')
                 elif v == 'q_l':

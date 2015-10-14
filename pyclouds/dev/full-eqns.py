@@ -81,5 +81,5 @@ profiles.append(cloud_model.integrate(**integration_kwargs))
 cloud_model = cloud_equations.FullThermodynamicsCloudEquations(gamma=gamma, D=D+dD, beta=beta+d_beta, **default_kwargs)
 profiles.append(cloud_model.integrate(initial_condition, z_points))
 
-fig = plotting.plot_profiles(profiles, vars=['r', 'w', 'T', 'q_v', 'mse', 'T__tephigram',])
+fig = plotting.plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'mse', 'T__tephigram',])
 fig.savefig('/tmp/cloud-profile-comparison.png')

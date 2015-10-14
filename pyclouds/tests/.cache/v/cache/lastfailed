@@ -1,3 +1,4 @@
 {
-  "test_finite_adjustment_microphysics.py": true
+  "test_full_eqns.py::test__acceleration_by_latent_heat": true, 
+  "test_full_eqns.py::test__entrainment": true
 }

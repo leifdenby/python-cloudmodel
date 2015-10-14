@@ -6,31 +6,7 @@ import warnings
 import numpy as np
 import plotting
 
-from common import AttrDict, Var
-
-default_constants = {
-    "R_d": 287.05,
-    "R_v": 461.51,
-    "L_v": 2.5008e6,
-    "L_s": 2.8345e6,
-    "cp_d": 1005.46,
-    "cp_v": 1859.0,
-    "rho_l": 1000.,
-    "rho_i": 500.,
-    "g": 9.80665,
-}
-
-CCFM_constants = {
-    "R_d": 287.05,  # 'Rd'
-    "R_v": 461.51,  # 'Rv'
-    "L_v": 2.5008e6,  # 'aLv'
-    "L_s": 2.8345e6,  # 'aLs'
-    "cp_d": 1005.46,  # 'Cpd'
-    "cp_v": 1859.0,  # not specified in CCFM?
-    "rho_l": 1000.,  # 'Rho_w'
-    "rho_i": 500.,  # 'Rho_i'
-    "g": 9.80665,  # 'g'
-}
+from common import AttrDict, Var, default_constants
 
 
 class CloudProfile():
@@ -40,7 +16,7 @@ class CloudProfile():
         self.cloud_model = cloud_model
 
     def plot(self):
-        return plotting.plot_profiles([self,], vars=['r', 'w', 'T',])
+        return plotting.plot_profiles([self,], variables=['r', 'w', 'T',])
 
     def __str__(self):
         return str(self.cloud_model)
@@ -525,7 +501,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
 
         # 3. With new temperature estimate new state from phase changes predicted by microphysics
-        F_s = self.microphysics(F_s, p=p)
+        F_s = self.microphysics(F_s, p=p, dt=None)
 
         dTdz_ = F_s[Var.T] - F[Var.T]
         dFdz_[Var.T] = dTdz_

@@ -7,8 +7,7 @@ import odespy
 from scipy.constants import pi
 
 from pyclouds.cloud_equations import Var
-from common import AttrDict
-from pyclouds.utils import default_constants
+from common import AttrDict, default_constants
 from pyclouds.plotting import plot_hydrometeor_evolution
 from pyclouds import parameterisations as default_parameterisations
 
@@ -65,13 +64,18 @@ class BaseMicrophysicsModel(object):
 
         return HydrometeorEvolution(F=F, t=t, model=self, extra_vars=self.extra_vars,)
 
+    def __call__(self, F, p, dt):
+        return self.dFdt(F=F, p=p)*dt
+
 class DummyMicrophysics(BaseMicrophysicsModel):
     """
     Dummy microphysics implementation that doesn't affect the state at all.
     """
 
-
     def dFdt(self, F, p):
+        return np.zeros((Var.NUM))
+
+    def __call__(self, F, p, dt):
         return F
 
 class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
@@ -95,6 +99,9 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         F[1:] = self._calc_adjusted_state(F=F0, p=p0, iterations=iterations)
 
         return HydrometeorEvolution(F=F, t=t, model=self, integration_kwargs={ 'iterations': iterations, })
+
+    def __call__(self, F, p, dt):
+        return self._calc_adjusted_state(F=F, p=p, iterations=3)
 
     def qv_sat(self, T, p):
         return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
