@@ -195,8 +195,10 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         rho_g = self._calc_mixture_density(qd=qd, qv=qv, ql=0., qi=0., qr=0., p=p, T=T)
 
 
-        r_c = (ql*rho/(4./3.*pi*self.N0*rho_l))**(1./3.)
-        r_c__0 = r_c
+        if ql == 0.0:
+            r_c = self.r0
+        else:
+            r_c = (ql*rho/(4./3.*pi*self.N0*rho_l))**(1./3.)
 
         if r_c > self.r_crit:
             # if cloud droplet radius with initial number of droplets is larger
@@ -206,8 +208,6 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
             r_c = self.r_crit
         else:
             Nc = self.N0
-            r_c = self.r0
-
 
         # condensation evaporation of cloud droplets (given number of droplets
         # and droplet radius calculated above)
@@ -229,7 +229,6 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         dFdz[Var.T] = Lv/cp_m*dqc_dt
 
         self.extra_vars.setdefault('r_c', []).append(r_c)
-        self.extra_vars.setdefault('r_c__0', []).append(r_c__0)
         self.extra_vars.setdefault('Nc', []).append(Nc)
         self.extra_vars.setdefault('t_substeps', []).append(t)
 
