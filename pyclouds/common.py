@@ -1,3 +1,5 @@
+import odespy
+import numpy as np
 
 default_constants = {
     "R_d": 287.05,
@@ -47,3 +49,28 @@ class AttrDict(dict):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
 
+
+
+REQUIRED_POSITIVE = np.zeros((Var.NUM))
+# REQUIRED_POSITIVE[Var.r] = 1
+# REQUIRED_POSITIVE[Var.q_v] = 1
+REQUIRED_POSITIVE[Var.q_l] = 1
+# REQUIRED_POSITIVE[Var.q_r] = 1
+# REQUIRED_POSITIVE[Var.q_i] = 1
+
+class MySolver(odespy.RKFehlberg):
+
+    def advance(self):
+        f, n, rtol, atol = self.f, self.n, self.rtol, self.atol
+        u_n, t_n, t_np1 = self.u[n], self.t[n], self.t[n+1]
+        dt = t_np1 - t_n
+
+        dt_max__all = np.abs(f(u_n, t_n)/u_n)
+        dt_max__all[REQUIRED_POSITIVE == 0] = 1.0e31
+
+        self.max_step = min(np.min(dt_max__all), self.first_step)
+        print self.max_step, dt_max__all
+        self.first_step = self.max_step
+        import ipdb
+        with ipdb.launch_ipdb_on_exception():
+            return odespy.RKFehlberg.advance(self)

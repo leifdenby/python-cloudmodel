@@ -156,6 +156,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         self.N0 = 200*1.e6  # initial aerosol number concentration [m-3]
         self.r0 = 0.1e-6  # cloud droplet initial radius
         self.r_crit = r_crit  # critical cloud droplet radius [m] after which the number of cloud droplets is increased
+        self.debug = True
 
     def _calc_mixture_density(self, qd, qv, ql, qi, qr, p, T):
         warnings.warn("EoS calculation stored within microphysics, should really use something defined externally")
@@ -173,10 +174,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
 
     def dFdt(self, F, t, p):
-        rho_l = self.constants.rho_l
         Lv = self.constants.L_v
-        R_v = self.constants.R_v
-        R_d = self.constants.R_d
         cp_d = self.constants.cp_d
         cp_v = self.constants.cp_v
 
@@ -194,6 +192,64 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         # gas density
         rho_g = self._calc_mixture_density(qd=qd, qv=qv, ql=0., qi=0., qr=0., p=p, T=T)
 
+        dql_dt = self._dql_dt__cond_evap(rho=rho, rho_g=rho_g, qv=qv, ql=ql, T=T, p=p)
+
+        qg = qv + qd
+        dqr_dt_1 = self._dqr_dt__autoconversion(ql=ql, qg=qg, rho_g=rho_g)
+        dqr_dt_2 = self._dqr_dt__accretion(ql=ql, qg=qg, qr=qr, rho_g=rho_g)
+
+        dqr_dt = dqr_dt_1 + dqr_dt_2
+
+        dFdz = np.zeros((Var.NUM))
+        dFdz[Var.q_l] =  dql_dt -dqr_dt
+        dFdz[Var.q_v] = -dql_dt
+        dFdz[Var.q_r] =          dqr_dt
+        dFdz[Var.T] = Lv/cp_m*dql_dt
+
+        if self.debug:
+            self.extra_vars.setdefault('t_substeps', []).append(t)
+
+        return dFdz
+
+    def _dqr_dt__autoconversion(self, ql, qg, rho_g):
+        """
+        Create rain droplets through collision and coalescence of cloud
+        droplets
+        """
+        k_c = 1.e-3
+        a_c = 5.e-4
+
+        dqr_dt = k_c*(ql - qg/rho_g*a_c)
+
+        # TODO: Is it reasonable to limit this? It seems the autoconversion
+        # equation doesn't really make sense to describe breakup
+        dqr_dt = max(0., dqr_dt)
+
+        return dqr_dt
+
+    def _dqr_dt__accretion(self, rho_g, ql, qg, qr):
+        rho_l = self.constants.rho_l
+        G3p5 = 3.32399614155  # = Gamma(3.5)
+        N0r = 1.e7  # [m^-4]
+        a_r = 201.0  # [m^.5 s^-1]
+        rho0 = 1.12
+
+        lambda_r = (pi*(qg*rho_l)/(qr*rho_g)*N0r)**(1./4.)
+
+        if qr > 0.:
+            import ipdb
+            ipdb.set_trace()
+
+        dqr_dt = pi/4.*N0r*a_r*np.sqrt(rho0/rho_g)*G3p5*lambda_r**(-3.5)*ql
+
+        return 0.*max(dqr_dt, 0.0)
+
+
+    def _dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
+        Lv = self.constants.L_v
+        R_v = self.constants.R_v
+        R_d = self.constants.R_d
+        rho_l = self.constants.rho_l
 
         if ql == 0.0:
             r_c = self.r0
@@ -221,18 +277,13 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         Fd = R_v*T/(pv_sat*Dv)
 
         # compute rate of change of condensate from diffusion
-        dqc_dt = 4*pi*1./rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
+        dql_dt = 4*pi*1./rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
 
-        dFdz = np.zeros((Var.NUM))
-        dFdz[Var.q_l] = dqc_dt
-        dFdz[Var.q_v] = -dqc_dt
-        dFdz[Var.T] = Lv/cp_m*dqc_dt
+        if self.debug:
+            self.extra_vars.setdefault('r_c', []).append(r_c)
+            self.extra_vars.setdefault('Nc', []).append(Nc)
 
-        self.extra_vars.setdefault('r_c', []).append(r_c)
-        self.extra_vars.setdefault('Nc', []).append(Nc)
-        self.extra_vars.setdefault('t_substeps', []).append(t)
-
-        return dFdz
+        return dql_dt
 
 
     def __call__(self, F, p):

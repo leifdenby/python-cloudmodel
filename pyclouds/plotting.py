@@ -248,9 +248,9 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
             t_max = max(max(evolution.t), t_max)
 
             if v == 'q_l':
-                plot.ylabel('specific concentration of cloud water [kg/kg]')
+                plot.ylabel('cloud water specific concentration [kg/kg]')
             if v == 'q_v':
-                plot.ylabel('specific concentration of water vapour [kg/kg]')
+                plot.ylabel('water vapour specific concentration [kg/kg]')
 
                 T = evolution.F[:,Var.T]
                 p = evolution.model.p0
@@ -266,6 +266,8 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
                 plot.ylabel(r'Cloud droplet number concention [$m^{-3}$]')
             elif v == 'T':
                 plot.ylabel('Temperature [K]')
+            elif v == 'q_r':
+                plot.ylabel('rain specific concentration [kg/kg]')
 
         d_data = 0.1*(data_max-data_min)
         d_t = 0.1*t_max
@@ -277,10 +279,4 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
 
         leg = plot.legend(loc=legend_loc)
         leg.get_frame().set_alpha(0.8)
-
-
-
-
-
-
-
+    return fig
