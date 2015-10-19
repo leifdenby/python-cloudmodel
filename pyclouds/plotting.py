@@ -209,6 +209,7 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
     fig = plot.figure(figsize=(12,6*n))
 
     lines = []
+    colors = {}
     for n, (v, s) in enumerate(zip(variables, list(gs))):
         t_max = 0.
         data_max = 0.
@@ -233,7 +234,14 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
                 else:
                     raise Exception("Variable %s not found" % v)
 
-            lines += plot.plot(evolution_time, evolution_data, label=str(evolution), marker='.', linestyle='',)
+            color = colors.get(evolution, None)
+            if not color is None:
+                line = plot.plot(evolution_time, evolution_data, label=str(evolution), marker='.', linestyle='', color=color)
+            else:
+                line = plot.plot(evolution_time, evolution_data, label=str(evolution), marker='.', linestyle='')
+            if not v in colors:
+                colors[evolution] = line[0].get_color()
+            lines += line
 
             data_max = max(max(evolution_data), data_max)
             data_min = min(min(evolution_data), data_min)
