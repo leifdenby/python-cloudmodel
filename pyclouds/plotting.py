@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plot
 import matplotlib.gridspec as gridspec
 import numpy as np
+import warnings
 
 try:
     from tephigram_python.tephigram_plotter import Tephigram
@@ -256,10 +257,13 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
                 p = evolution.model.p0
                 if hasattr(evolution.model, 'qv_sat'):
                     q_v__sat = evolution.model.qv_sat(T=T, p=p)
-                    data_min = min(min(q_v__sat), data_min)
-                    data_max = max(max(q_v__sat), data_max)
-                    color = lines[n_evolution].get_color()
-                    plot.plot(evolution.t, q_v__sat, marker='', color=color, label='', linestyle=':')
+                else:
+                    warnings.warn("Using default constant for calculating `qv_sat` for %s" % str(evolution))
+                    q_v__sat = parameterisations.pv_sat.qv_sat(T=T, p=p)
+                data_min = min(min(q_v__sat), data_min)
+                data_max = max(max(q_v__sat), data_max)
+                color = lines[n_evolution].get_color()
+                plot.plot(evolution.t, q_v__sat, marker='', color=color, label='', linestyle=':')
             elif v == 'r_c' or v == 'r_c__0':
                 plot.ylabel('Cloud droplet radius [$\mu m$]')
             elif v == 'Nc':

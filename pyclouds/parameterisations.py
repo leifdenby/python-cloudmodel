@@ -92,27 +92,56 @@ class SaturationVapourPressure(BaseParameterisation):
     def __call__(self, T):
         return self.pv_sat(T)
 
-class ThermalExpansionCoefficient(BaseParameterisation):
+class ThermalConductivityCoefficient(BaseParameterisation):
     default_constants = {
-        'a': 2.4e-2,
-        'b': 8.0e-5,
+        'a_K': 8.0e-5,
+        'b_K': 2.4e-2,
     }
 
     def __call__(self, T):
-        return self.constants.a*T + self.constants.b
+        return self.constants.a_K*(T-273.15) + self.constants.b_K
+
+    def __str__(self):
+
+        return "Linear model (%s)" % ", ".join(["%s=%.3g" % (k, v) for (k, v) in self.constants.items() ])
 
 class WaterVapourDiffusionCoefficient(BaseParameterisation):
-    default_constants = {
+    ATHAM_constants = {
         'a': 2.11e-5,
         'b': 1.94,
     }
 
-    def __call__(self, T):
+    # these constants were obtained by fitting against data in Rogers & Yau
+    default_constants = {
+        'a': 2.20e-5,
+        'b': 1.92,
+    }
+
+    def __call__(self, T, p):
         a = self.constants.a
         b = self.constants.b
         T0 = 273.15
 
-        return a*(T/T0)**b
+        # tabulated values in Rogers & Yau are given for p=10000Pa reference pressure,
+        # have to scale by pressure get the correct diffusivity
+
+        return a*(T/T0)**b*10000./p
+
+    def __str__(self):
+        constants_label_s = {
+            "ATHAM": self.ATHAM_constants,
+            "fitted to Rogers & Yau": self.default_constants,
+        }
+
+        constants_label = ''
+        for k, v in constants_label_s.items():
+            if self.constants == v:
+                constants_label = k + ": "
+                break
+
+        constants_label += ", ".join(["%s=%.03g" % (k, v) for (k, v) in self.constants.items()])
+
+        return "power-law (%s)" % constants_label
 
 class ParametersationsWithSpecificConstants:
     def __wrap(self, parameterisation, constants, subset):
@@ -136,9 +165,9 @@ class ParametersationsWithSpecificConstants:
     def __init__(self, constants):
         constants = common.make_related_constants(constants)
         self.pv_sat = self.__wrap(SaturationVapourPressure, constants, 'pv_sat')
-        self.Ka = ThermalExpansionCoefficient()
+        self.Ka = self.__wrap(ThermalConductivityCoefficient, constants, 'Ka')
         self.Dv = WaterVapourDiffusionCoefficient()
 
 pv_sat = SaturationVapourPressure()
-Ka = ThermalExpansionCoefficient()
+Ka = ThermalConductivityCoefficient()
 Dv = WaterVapourDiffusionCoefficient()

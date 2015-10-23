@@ -22,6 +22,56 @@ except ImportError:
     # # import pure python version instead
 from ccfm.ccfmpython import microphysics as ccfm_microphysics
 
+class PyCloudsUnifiedMicrophysicsStateMapping():
+    """
+    Utility for providing mapping between pycloud state representation and
+    unified-microphysics model representation.
+
+    TODO: Make pyclouds use indexing from `unified microphysics`
+    
+    XXX: this is kinda hacky, I only reassign state variables that are actually
+    used in the initialized model in `unified microphysics`
+    """
+    def __init__(self):
+        register = unified_microphysics.microphysics_register
+        # Fortran indexing starts at 1
+        self.idx_water_vapour = register.idx_water_vapour-1
+        self.idx_cwater = register.idx_cwater-1
+        self.idx_rain = register.idx_rain-1
+        self.idx_cice = register.idx_cice-1
+
+        self.n_gases = register.n_gases
+        self.n_moments__max = register.n_moments__max
+        self.n_solids = register.n_solids
+
+    def um_pycloud(self, q_g, q_tr, T):
+        F = np.zeros((Var.NUM))
+        if self.idx_water_vapour != -1:
+            F[Var.q_v] = q_g[self.idx_water_vapour]
+        if self.idx_cwater != -1:
+            F[Var.q_l] = q_tr[self.idx_cwater]
+        if self.idx_rain != -1:
+            F[Var.q_r] = q_tr[self.idx_rain]
+        if self.idx_cice != -1:
+            F[Var.q_i] = q_tr[self.idx_cice]
+        F[Var.T] = T
+        return F
+
+    def pycloud_um(self, F):
+        q_g = np.zeros((self.n_gases,))
+        q_tr = np.zeros((self.n_solids, self.n_moments__max))
+
+        if self.idx_water_vapour != -1:
+            q_g[self.idx_water_vapour] = F[Var.q_v]
+        if self.idx_cwater != -1:
+            q_tr[self.idx_cwater,0] = F[Var.q_l]
+        if self.idx_rain != -1:
+            q_tr[self.idx_rain,0] = F[Var.q_r]
+        if self.idx_cice != -1:
+            q_tr[self.idx_cice,0] = F[Var.q_i]
+
+        return q_g, q_tr, F[Var.T]
+
 class HydrometeorEvolution:
     def __init__(self, F, t, model, integration_kwargs={}, extra_vars={}):
         self.F = F
@@ -195,13 +245,14 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         # gas density
         rho_g = self._calc_mixture_density(qd=qd, qv=qv, ql=0., qi=0., qr=0., p=p, T=T)
 
-        dql_dt = self._dql_dt__cond_evap(rho=rho, rho_g=rho_g, qv=qv, ql=ql, T=T, p=p)
+        dql_dt = self.dql_dt__cond_evap(rho=rho, rho_g=rho_g, qv=qv, ql=ql, T=T, p=p)
 
         qg = qv + qd
         dqr_dt_1 = self._dqr_dt__autoconversion(ql=ql, qg=qg, rho_g=rho_g)
         dqr_dt_2 = self._dqr_dt__accretion(ql=ql, qg=qg, qr=qr, rho_g=rho_g)
 
         dqr_dt = dqr_dt_1 + dqr_dt_2
+        dqr_dt = 0.0
 
         dFdz = np.zeros((Var.NUM))
         dFdz[Var.q_l] =  dql_dt -dqr_dt
@@ -209,7 +260,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         dFdz[Var.q_r] =          dqr_dt
         dFdz[Var.T] = Lv/cp_m*dql_dt
 
-        if self.debug:
+        if self.debug and hasattr(self, 'extra_vars'):
             self.extra_vars.setdefault('t_substeps', []).append(t)
 
         return dFdz
@@ -244,7 +295,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         return 0.*max(dqr_dt, 0.0)
 
 
-    def _dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
+    def dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
         Lv = self.constants.L_v
         R_v = self.constants.R_v
         R_d = self.constants.R_d
@@ -272,13 +323,13 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         Fk = (Lv/(R_v*T) - 1)*Lv/(Ka*T)
 
         pv_sat = self.parameterisations.pv_sat(T=T)
-        Dv = self.parameterisations.Dv(T=T)
+        Dv = self.parameterisations.Dv(T=T, p=p)
         Fd = R_v*T/(pv_sat*Dv)
 
         # compute rate of change of condensate from diffusion
         dql_dt = 4*pi*1./rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
 
-        if self.debug:
+        if self.debug and hasattr(self, 'extra_vars'):
             self.extra_vars.setdefault('r_c', []).append(r_c)
             self.extra_vars.setdefault('Nc', []).append(Nc)
 
@@ -307,34 +358,13 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
     def dFdt(self, F, t, p):
         # TODO: construct state variable structure using information from
         # fortran library, instead of mapping explicitly here
+        state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
 
-        register = unified_microphysics.microphysics_register
-        # Fortran indexing starts at 1
-        idx_water_vapour = register.idx_water_vapour-1
-        idx_cwater = register.idx_cwater-1
-        idx_rain = register.idx_rain-1
-        idx_cice = register.idx_cice-1
+        q_g, q_tr, T = state_mapping.pycloud_um(F)
 
-        n_gases = register.n_gases
-        n_moments__max = register.n_moments__max
-        n_solids = register.n_solids
+        dqdt_g, dqdt_tr, dTdt, _ = unified_microphysics.microphysics_pylib.dqdt(q_g=q_g, q_tr=q_tr, temp=T, pressure=p)
 
-        q_g = np.zeros((n_gases,))
-        q_tr = np.zeros((n_solids, n_moments__max))
-
-        q_g[idx_water_vapour] = F[Var.q_v]
-        q_tr[idx_cwater,0] = F[Var.q_l]
-        q_tr[idx_rain,0] = F[Var.q_r]
-        q_tr[idx_cice,0] = F[Var.q_i]
-        T = F[Var.T]
-
-        dqdt_g, dqdt_tr, _ = unified_microphysics.microphysics_pylib.dqdt(q_g=q_g, q_tr=q_tr, temp=T, pressure=p)
-
-        dFdz = np.zeros((Var.NUM))
-        dFdz[Var.q_v] = dqdt_g[idx_water_vapour]
-        dFdz[Var.q_l] = dqdt_tr[idx_cwater]
-        dFdz[Var.q_r] = dqdt_tr[idx_rain]
-        dFdz[Var.q_i] = dqdt_tr[idx_cice]
+        dFdz = state_mapping.um_pycloud(q_g=dqdt_g, q_tr=dqdt_tr, T=dTdt)
 
         return dFdz
 

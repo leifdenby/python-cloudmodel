@@ -23,9 +23,9 @@ sol = microphysics_model.integrate(initial_condition=initial_condition, t=t_, p0
 # sol1 = microphysics_model.integrate(initial_condition=initial_condition, t=t_, p0=p0, iterations=3)
 # sol2 = cloud_microphysics.FiniteCondensationTimeMicrophysics().integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass)
 sol2 = cloud_microphysics.FiniteCondensationTimeMicrophysics(r_crit=6e-6).integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass)
-sol3 = cloud_microphysics.FiniteCondensationTimeMicrophysics(r_crit=np.inf).integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass)
+sol3 = cloud_microphysics.FortranNoIceMicrophysics().integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass)
 
 #sol2.plot()
-plot = plot_hydrometeor_evolution([sol2, sol3], variables=['q_v', 'r_c', 'q_l', 'q_r'])
+plot = plot_hydrometeor_evolution([sol2, sol3], variables=['q_v', 'T', 'q_l', 'q_r', 'r_c', ])
 plot.savefig('/scratch/local1/plots/microphysics.png')
 
