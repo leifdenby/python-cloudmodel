@@ -13,6 +13,11 @@ default_constants = {
     "g": 9.80665,
     "cv_d": 717.60, # J/kg/K
     "cv_v": 1402.5, # J/kg/K
+    "pv_sat": {  # constants for calculating saturation vapour pressure with Teten's formula
+        "p0vs": 611.2,
+        "a0_lq": 17.67,
+        "a1_lq": -32.19,
+    }
 }
 
 CCFM_constants = {
@@ -25,6 +30,30 @@ CCFM_constants = {
     "rho_l": 1000.,  # 'Rho_w'
     "rho_i": 500.,  # 'Rho_i'
     "g": 9.80665,  # 'g'
+}
+
+def make_related_constants(constants):
+    if 'cp_d' in constants and 'cp_v' in constants and not 'R_d' in constants:
+        constants['R_d'] = constants['cp_d'] - constants['cv_d']
+        constants['R_v'] = constants['cp_v'] - constants['cv_v']
+    return constants
+
+um_constants = {
+    "cp_d": 1004.64,
+    "cv_d": 717.60,
+    "cp_v": 1864.,
+    "cv_v": 1402.55,
+    "cp_l": 4183.,
+    "cv_l": 4183.,
+    "cp_i": 2103.,
+    "cv_i": 2103.,
+    "L_v": 2500.8,
+    "rho_l": 1000.,
+    "pv_sat": {  # constants for calculating saturation vapour pressure with Teten's formula
+        "p0vs": 610.7,
+        "a0_lq": 17.25,
+        "a1_lq": 36.
+    },
 }
 
 # r, w, T, q_v, q_r, q_l, q_i

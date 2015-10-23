@@ -7,9 +7,9 @@ import odespy
 from scipy.constants import pi
 
 from pyclouds.cloud_equations import Var
-from common import AttrDict, default_constants
+from common import AttrDict, default_constants, make_related_constants
 from pyclouds.plotting import plot_hydrometeor_evolution
-from pyclouds import parameterisations as default_parameterisations
+from pyclouds import parameterisations
 
 # try:
     # from ccfm.ccfmfortran import microphysics as ccfm_microphysics
@@ -34,14 +34,12 @@ class HydrometeorEvolution:
             s += " (%s)" % ", ".join(["%s: %s" % (k, str(v)) for (k, v) in self.integration_kwargs.items()])
         return s
 
-
 class BaseMicrophysicsModel(object):
     def __init__(self, constants=default_constants, *args, **kwargs):
-        self.parameterisations = kwargs.get('parameterisations', default_parameterisations)
+        constants = make_related_constants(constants)
+
+        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.constants = AttrDict(constants)
-        if not hasattr(constants, 'R_d'):
-            self.constants.R_d = self.constants.cp_d - self.constants.cv_d
-            self.constants.R_v = self.constants.cp_v - self.constants.cv_v
 
     def dFdt(F, t):
         raise NotImplemented
@@ -235,10 +233,6 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         rho0 = 1.12
 
         lambda_r = (pi*(qg*rho_l)/(qr*rho_g)*N0r)**(1./4.)
-
-        if qr > 0.:
-            import ipdb
-            ipdb.set_trace()
 
         dqr_dt = pi/4.*N0r*a_r*np.sqrt(rho0/rho_g)*G3p5*lambda_r**(-3.5)*ql
 

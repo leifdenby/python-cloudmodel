@@ -1,6 +1,8 @@
 from common import AttrDict
+import common
 
 import numpy as np
+import warnings
 
 class BaseParameterisation(object):
     def __init__(self, constants=None):
@@ -8,7 +10,6 @@ class BaseParameterisation(object):
             constants = self.default_constants
 
         self.constants = AttrDict(constants)
-
 
 class SaturationVapourPressure(BaseParameterisation):
     default_constants = {
@@ -91,7 +92,6 @@ class SaturationVapourPressure(BaseParameterisation):
     def __call__(self, T):
         return self.pv_sat(T)
 
-
 class ThermalExpansionCoefficient(BaseParameterisation):
     default_constants = {
         'a': 2.4e-2,
@@ -113,6 +113,31 @@ class WaterVapourDiffusionCoefficient(BaseParameterisation):
         T0 = 273.15
 
         return a*(T/T0)**b
+
+class ParametersationsWithSpecificConstants:
+    def __wrap(self, parameterisation, constants, subset):
+        default_constants = parameterisation.default_constants
+
+        new_constants = {}
+        for c_name in default_constants.keys():
+            try:
+                new_value = constants[subset][c_name]
+            except KeyError:
+                new_value = constants.get(c_name, None)
+
+            if new_value is None:
+                new_value = default_constants.get(c_name)
+                warnings.warn("Using default value for %s" % c_name)
+
+            new_constants[c_name] = new_value
+
+        return parameterisation(new_constants)
+
+    def __init__(self, constants):
+        constants = common.make_related_constants(constants)
+        self.pv_sat = self.__wrap(SaturationVapourPressure, constants, 'pv_sat')
+        self.Ka = ThermalExpansionCoefficient()
+        self.Dv = WaterVapourDiffusionCoefficient()
 
 pv_sat = SaturationVapourPressure()
 Ka = ThermalExpansionCoefficient()
