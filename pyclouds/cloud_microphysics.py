@@ -11,6 +11,11 @@ from common import AttrDict, default_constants, make_related_constants
 from pyclouds.plotting import plot_hydrometeor_evolution
 from pyclouds import parameterisations
 
+try:
+    import unified_microphysics
+except ImportError:
+    unified_microphysics = None
+
 # try:
     # from ccfm.ccfmfortran import microphysics as ccfm_microphysics
 # except ImportError:
@@ -285,3 +290,53 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
     def __str__(self):
         return "Finite condensation time ($r_{crit}=%gm$)" % (self.r_crit)
+
+class FortranNoIceMicrophysics(BaseMicrophysicsModel):
+    """
+    Wrapper for state variable differentials calculated in
+    `unified-microphysics` Fortran library.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(FortranNoIceMicrophysics, self).__init__(*args, **kwargs)
+        if unified_microphysics is None:
+            raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
+
+        unified_microphysics.microphysics_pylib.init('no_ice')
+
+    def dFdt(self, F, t, p):
+        # TODO: construct state variable structure using information from
+        # fortran library, instead of mapping explicitly here
+
+        register = unified_microphysics.microphysics_register
+        # Fortran indexing starts at 1
+        idx_water_vapour = register.idx_water_vapour-1
+        idx_cwater = register.idx_cwater-1
+        idx_rain = register.idx_rain-1
+        idx_cice = register.idx_cice-1
+
+        n_gases = register.n_gases
+        n_moments__max = register.n_moments__max
+        n_solids = register.n_solids
+
+        q_g = np.zeros((n_gases,))
+        q_tr = np.zeros((n_solids, n_moments__max))
+
+        q_g[idx_water_vapour] = F[Var.q_v]
+        q_tr[idx_cwater,0] = F[Var.q_l]
+        q_tr[idx_rain,0] = F[Var.q_r]
+        q_tr[idx_cice,0] = F[Var.q_i]
+        T = F[Var.T]
+
+        dqdt_g, dqdt_tr, _ = unified_microphysics.microphysics_pylib.dqdt(q_g=q_g, q_tr=q_tr, temp=T, pressure=p)
+
+        dFdz = np.zeros((Var.NUM))
+        dFdz[Var.q_v] = dqdt_g[idx_water_vapour]
+        dFdz[Var.q_l] = dqdt_tr[idx_cwater]
+        dFdz[Var.q_r] = dqdt_tr[idx_rain]
+        dFdz[Var.q_i] = dqdt_tr[idx_cice]
+
+        return dFdz
+
+    def __str__(self):
+        return "Fortran ('no_ice') model"
