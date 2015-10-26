@@ -12,7 +12,7 @@ from pyclouds.plotting import plot_hydrometeor_evolution
 from pyclouds import parameterisations
 
 try:
-    import unified_microphysics
+    import unified_microphysics.fortran as unified_microphysics
 except ImportError:
     unified_microphysics = None
 
@@ -36,6 +36,7 @@ class PyCloudsUnifiedMicrophysicsStateMapping():
         register = unified_microphysics.microphysics_register
         # Fortran indexing starts at 1
         self.idx_water_vapour = register.idx_water_vapour-1
+        self.idx_dry_air = register.idx_dry_air-1
         self.idx_cwater = register.idx_cwater-1
         self.idx_rain = register.idx_rain-1
         self.idx_cice = register.idx_cice-1
@@ -69,6 +70,8 @@ class PyCloudsUnifiedMicrophysicsStateMapping():
             q_tr[self.idx_rain,0] = F[Var.q_r]
         if self.idx_cice != -1:
             q_tr[self.idx_cice,0] = F[Var.q_i]
+
+        q_g[self.idx_dry_air] = 1.0 - np.sum(q_g) - np.sum(q_tr[:,0])
 
         return q_g, q_tr, F[Var.T]
 
@@ -211,7 +214,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         self.r_crit = r_crit  # critical cloud droplet radius [m] after which the number of cloud droplets is increased
         self.debug = True
 
-    def _calc_mixture_density(self, qd, qv, ql, qi, qr, p, T):
+    def calc_mixture_density(self, qd, qv, ql, qi, qr, p, T):
         warnings.warn("EoS calculation stored within microphysics, should really use something defined externally")
 
         R_d = self.constants.R_d
@@ -241,9 +244,9 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         cp_m = cp_d*qd + (ql + qr + qi + qv)*cp_v
 
         # mixture density
-        rho = self._calc_mixture_density(qd=qd, qv=qv, ql=ql, qi=qi, qr=qr, p=p, T=T)
+        rho = self.calc_mixture_density(qd=qd, qv=qv, ql=ql, qi=qi, qr=qr, p=p, T=T)
         # gas density
-        rho_g = self._calc_mixture_density(qd=qd, qv=qv, ql=0., qi=0., qr=0., p=p, T=T)
+        rho_g = self.calc_mixture_density(qd=qd, qv=qv, ql=0., qi=0., qr=0., p=p, T=T)
 
         dql_dt = self.dql_dt__cond_evap(rho=rho, rho_g=rho_g, qv=qv, ql=ql, T=T, p=p)
 
@@ -252,7 +255,6 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         dqr_dt_2 = self._dqr_dt__accretion(ql=ql, qg=qg, qr=qr, rho_g=rho_g)
 
         dqr_dt = dqr_dt_1 + dqr_dt_2
-        dqr_dt = 0.0
 
         dFdz = np.zeros((Var.NUM))
         dFdz[Var.q_l] =  dql_dt -dqr_dt
@@ -292,7 +294,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         dqr_dt = pi/4.*N0r*a_r*np.sqrt(rho0/rho_g)*G3p5*lambda_r**(-3.5)*ql
 
-        return 0.*max(dqr_dt, 0.0)
+        return max(dqr_dt, 0.0)
 
 
     def dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
@@ -356,8 +358,6 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
         unified_microphysics.microphysics_pylib.init('no_ice')
 
     def dFdt(self, F, t, p):
-        # TODO: construct state variable structure using information from
-        # fortran library, instead of mapping explicitly here
         state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
 
         q_g, q_tr, T = state_mapping.pycloud_um(F)
@@ -367,6 +367,9 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
         dFdz = state_mapping.um_pycloud(q_g=dqdt_g, q_tr=dqdt_tr, T=dTdt)
 
         return dFdz
+
+    def qv_sat(self, T, p):
+        return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
 
     def __str__(self):
         return "Fortran ('no_ice') model"
