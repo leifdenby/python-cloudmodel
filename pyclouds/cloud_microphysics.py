@@ -39,38 +39,38 @@ class PyCloudsUnifiedMicrophysicsStateMapping():
         self.idx_cwater = register.idx_cwater-1
         self.idx_rain = register.idx_rain-1
         self.idx_cice = register.idx_cice-1
+        self.idx_temp = register.idx_temp-1
+        self.idx_pressure = register.idx_pressure-1
 
-        self.n_gases = register.n_gases
-        self.n_moments__max = register.n_moments__max
-        self.n_solids = register.n_solids
+        self.n_vars = register.n_variables
 
-    def um_pycloud(self, q_g, q_tr, T):
+    def um_pycloud(self, y):
         F = np.zeros((Var.NUM))
         if self.idx_water_vapour != -1:
-            F[Var.q_v] = q_g[self.idx_water_vapour]
+            F[Var.q_v] = y[self.idx_water_vapour]
         if self.idx_cwater != -1:
-            F[Var.q_l] = q_tr[self.idx_cwater]
+            F[Var.q_l] = y[self.idx_cwater]
         if self.idx_rain != -1:
-            F[Var.q_r] = q_tr[self.idx_rain]
+            F[Var.q_r] = y[self.idx_rain]
         if self.idx_cice != -1:
-            F[Var.q_i] = q_tr[self.idx_cice]
-        F[Var.T] = T
-        return F
+            F[Var.q_i] = y[self.idx_cice]
+        F[Var.T] = y[self.idx_temp]
+        return F, y[self.idx_pressure]
 
-    def pycloud_um(self, F):
-        q_g = np.zeros((self.n_gases,))
-        q_tr = np.zeros((self.n_solids, self.n_moments__max))
+    def pycloud_um(self, F, p):
+        y = np.zeros((self.n_vars,))
 
         if self.idx_water_vapour != -1:
-            q_g[self.idx_water_vapour] = F[Var.q_v]
+            y[self.idx_water_vapour] = F[Var.q_v]
         if self.idx_cwater != -1:
-            q_tr[self.idx_cwater,0] = F[Var.q_l]
+            y[self.idx_cwater] = F[Var.q_l]
         if self.idx_rain != -1:
-            q_tr[self.idx_rain,0] = F[Var.q_r]
+            y[self.idx_rain] = F[Var.q_r]
         if self.idx_cice != -1:
-            q_tr[self.idx_cice,0] = F[Var.q_i]
-
-        return q_g, q_tr, F[Var.T]
+            y[self.idx_cice] = F[Var.q_i]
+        y[self.idx_temp] = F[Var.T]
+        y[self.idx_pressure] = p
+        return y
 
 class HydrometeorEvolution:
     def __init__(self, F, t, model, integration_kwargs={}, extra_vars={}):
@@ -357,11 +357,11 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
     def dFdt(self, F, t, p):
         state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
 
-        q_g, q_tr, T = state_mapping.pycloud_um(F)
+        y = state_mapping.pycloud_um(F, p)
 
-        dqdt_g, dqdt_tr, dTdt, _ = unified_microphysics.microphysics_pylib.dqdt(q_g=q_g, q_tr=q_tr, temp=T, pressure=p)
+        dydt, _ = unified_microphysics.microphysics_pylib.dqdt(y=y)
 
-        dFdz = state_mapping.um_pycloud(q_g=dqdt_g, q_tr=dqdt_tr, T=dTdt)
+        dFdz, _ = state_mapping.um_pycloud(y=dydt)
 
         return dFdz
 
