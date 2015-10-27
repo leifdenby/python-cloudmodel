@@ -22,13 +22,6 @@ class SaturationVapourPressure(BaseParameterisation):
         "R_v": 461.51,
     }
 
-    CCFM_constants = {
-        'p0vs': 610.78,
-        'a0_lq': 17.269,
-        'a1_lq': 35.86,
-        'a0_ice': 21.875,
-        'a1_ice': 7.66,
-    }
 
     def pv_sat_liquid(self, T):
         p0vs = self.constants.p0vs
@@ -91,6 +84,24 @@ class SaturationVapourPressure(BaseParameterisation):
 
     def __call__(self, T):
         return self.pv_sat(T)
+
+    def __str__(self):
+        constants_label_s = {
+            "ATHAM": common.ATHAM_constants,
+            "pyclouds": common.default_constants,
+            "CCFM": common.CCFM_constants,
+        }
+
+        constants_label = ''
+        for k, v in constants_label_s.items():
+            if self.constants == v:
+                constants_label = k + ": "
+                break
+
+        constants_label += ", ".join(["%s=%.03g" % (k, v) for (k, v) in self.constants.items()])
+
+        return constants_label
+
 
 class ThermalConductivityCoefficient(BaseParameterisation):
     default_constants = {

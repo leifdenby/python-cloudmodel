@@ -12,9 +12,9 @@ import unified_microphysics.tests.test_common
 
 
 initial_condition = np.zeros((Var.NUM))
-initial_condition[Var.q_v] = 0.017
-initial_condition[Var.T] = 300.
-p0 = 101325.1  # [Pa]
+initial_condition[Var.q_v] = 1.35e-2
+initial_condition[Var.T] = 297.0
+p0 = 99835.
 
 t_ = np.linspace(0., 10., 100)
 

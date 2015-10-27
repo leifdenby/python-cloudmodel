@@ -36,7 +36,6 @@ class PyCloudsUnifiedMicrophysicsStateMapping():
         register = unified_microphysics.microphysics_register
         # Fortran indexing starts at 1
         self.idx_water_vapour = register.idx_water_vapour-1
-        self.idx_dry_air = register.idx_dry_air-1
         self.idx_cwater = register.idx_cwater-1
         self.idx_rain = register.idx_rain-1
         self.idx_cice = register.idx_cice-1
@@ -70,8 +69,6 @@ class PyCloudsUnifiedMicrophysicsStateMapping():
             q_tr[self.idx_rain,0] = F[Var.q_r]
         if self.idx_cice != -1:
             q_tr[self.idx_cice,0] = F[Var.q_i]
-
-        q_g[self.idx_dry_air] = 1.0 - np.sum(q_g) - np.sum(q_tr[:,0])
 
         return q_g, q_tr, F[Var.T]
 

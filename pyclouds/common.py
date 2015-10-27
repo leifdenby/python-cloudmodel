@@ -30,6 +30,27 @@ CCFM_constants = {
     "rho_l": 1000.,  # 'Rho_w'
     "rho_i": 500.,  # 'Rho_i'
     "g": 9.80665,  # 'g'
+    "pv_sat": {
+        'p0vs': 610.78,
+        'a0_lq': 17.269,
+        'a1_lq': -35.86,
+        'a0_ice': 21.875,
+        'a1_ice': -7.66,
+    }
+}
+
+ATHAM_constants = {
+    "R_d": 287.04,
+    "cp_d": 1004.64,
+    "R_v": 460.,
+    "cp_v": 1870.,
+    "pv_sat": {
+        'p0vs': 610.7,
+        'a0_lq': 17.25,
+        'a1_lq': -36.0,
+        'a0_ice': 22.33,
+        'a1_ice': -2.,
+    },
 }
 
 def make_related_constants(constants):
