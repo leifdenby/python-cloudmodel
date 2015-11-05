@@ -7,12 +7,14 @@ default_constants = {
     "L_v": 2.5008e6,
     "L_s": 2.8345e6,
     "cp_d": 1005.46,
+    "cv_d": 717.60, # J/kg/K
     "cp_v": 1859.0,
+    "cv_v": 1402.5, # J/kg/K
+    "cp_l": 4183.0,
+    "cv_l": 4183.0, # same as cp as liquid is assumed incompressible
     "rho_l": 1000.,
     "rho_i": 500.,
     "g": 9.80665,
-    "cv_d": 717.60, # J/kg/K
-    "cv_v": 1402.5, # J/kg/K
     "pv_sat": {  # constants for calculating saturation vapour pressure with Teten's formula
         "p0vs": 611.2,
         "a0_lq": 17.67,
@@ -91,8 +93,8 @@ class Var:
     NUM = len(names)
 
     @staticmethod
-    def print_formatted(v):
-        print ",\t".join(["%s=%g" % (Var.names[i], v[i]) for i in range(Var.NUM)])
+    def print_formatted(v, formatting='%g'):
+        print ",\t".join([("%s=" + formatting) % (Var.names[i], v[i]) for i in range(Var.NUM)])
 
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):

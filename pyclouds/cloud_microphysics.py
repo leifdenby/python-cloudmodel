@@ -13,6 +13,7 @@ from pyclouds import parameterisations
 
 try:
     import unified_microphysics.fortran as unified_microphysics
+    import unified_microphysics.tests as um_tests
 except ImportError:
     unified_microphysics = None
 
@@ -149,7 +150,12 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         F0 = initial_condition
         F = np.zeros((len(t), Var.NUM))
         F[0] = initial_condition
-        F[1:] = self._calc_adjusted_state(F=F0, p=p0, iterations=iterations)
+        F_adjusted = self._calc_adjusted_state(F=F0, p=p0, iterations=iterations)
+
+        if F_adjusted[Var.q_l] < 0.0:
+            F[1:] = F0
+        else:
+            F[1:] = F_adjusted
 
         return HydrometeorEvolution(F=F, t=t, model=self, integration_kwargs={ 'iterations': iterations, })
 
@@ -226,6 +232,22 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
     def qv_sat(self, T, p):
         return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
 
+    def cp_m(self, F):
+        qv = F[Var.q_v]
+        ql = F[Var.q_l]
+        qr = F[Var.q_r]
+        qi = F[Var.q_i]
+        qd = 1. - qv - ql - qr - qi
+
+        cp_d = self.constants.cp_d
+        cp_v = self.constants.cp_v
+        cp_l = self.constants.cp_l
+
+        if qi != 0.0:
+            raise NotImplementedError
+
+        return cp_d*qd + (ql + qr)*cp_l + qv*cp_v
+
     def dFdt(self, F, t, p):
         Lv = self.constants.L_v
         cp_d = self.constants.cp_d
@@ -235,10 +257,18 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         ql = F[Var.q_l]
         qr = F[Var.q_r]
         qi = F[Var.q_i]
+
+        # the integrator may have put us below zero, this is non-conservative,
+        # but I don't have any other options here since I can't modify the
+        # integrator's logic
+        if ql < 0.0:
+            ql = 0.0
+            F[Var.q_l] = ql
+
         qd = 1. - qv - ql - qr - qi
         T = F[Var.T]
 
-        cp_m = cp_d*qd + (ql + qr + qi + qv)*cp_v
+        cp_m = self.cp_m(F=F)
 
         # mixture density
         rho = self.calc_mixture_density(qd=qd, qv=qv, ql=ql, qi=qi, qr=qr, p=p, T=T)
@@ -300,7 +330,11 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         R_d = self.constants.R_d
         rho_l = self.constants.rho_l
 
-        if ql == 0.0:
+        # condensation evaporation of cloud droplets (given number of droplets
+        # and droplet radius calculated above)
+        Sw = qv/self.qv_sat(T=T, p=p)
+
+        if ql == 0.0 and Sw > 1.0:
             r_c = self.r0
         else:
             r_c = (ql*rho/(4./3.*pi*self.N0*rho_l))**(1./3.)
@@ -314,9 +348,6 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         else:
             Nc = self.N0
 
-        # condensation evaporation of cloud droplets (given number of droplets
-        # and droplet radius calculated above)
-        Sw = qv/self.qv_sat(T=T, p=p)
 
         Ka = self.parameterisations.Ka(T=T)
         Fk = (Lv/(R_v*T) - 1)*Lv/(Ka*T)
@@ -339,7 +370,52 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         pass
 
     def __str__(self):
-        return "Finite condensation time ($r_{crit}=%gm$)" % (self.r_crit)
+        return "Finite condensation rate ($r_{crit}=%gm$)" % (self.r_crit)
+
+class FC_min_radius(FiniteCondensationTimeMicrophysics):
+
+    def dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
+        Lv = self.constants.L_v
+        R_v = self.constants.R_v
+        R_d = self.constants.R_d
+        rho_l = self.constants.rho_l
+
+        # condensation evaporation of cloud droplets (given number of droplets
+        # and droplet radius calculated above)
+        Sw = qv/self.qv_sat(T=T, p=p)
+
+        r_c = (ql*rho/(4./3.*pi*self.N0*rho_l))**(1./3.)
+
+        if r_c > self.r_crit:
+            # if cloud droplet radius with initial number of droplets is larger
+            # than a critial size assume that instead more droplets are made,
+            # all with the critical radius
+            Nc = ql*rho/(4./3.*pi*rho_l*self.r_crit**3.0)
+            r_c = self.r_crit
+        elif r_c < self.r0:
+            r_c = self.r0
+            Nc = self.N0
+        else:
+            Nc = self.N0
+
+        Ka = self.parameterisations.Ka(T=T)
+        Fk = (Lv/(R_v*T) - 1)*Lv/(Ka*T)
+
+        pv_sat = self.parameterisations.pv_sat(T=T)
+        Dv = self.parameterisations.Dv(T=T, p=p)
+        Fd = R_v*T/(pv_sat*Dv)
+
+        # compute rate of change of condensate from diffusion
+        dql_dt = 4*pi*1./rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
+
+        if self.debug and hasattr(self, 'extra_vars'):
+            self.extra_vars.setdefault('r_c', []).append(r_c)
+            self.extra_vars.setdefault('Nc', []).append(Nc)
+
+        return dql_dt
+
+    def __str__(self):
+        return super(FC_min_radius, self).__str__() + r", $r_{min}=%gm$" % self.r0
 
 class FortranNoIceMicrophysics(BaseMicrophysicsModel):
     """
@@ -353,20 +429,29 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
         unified_microphysics.microphysics_pylib.init('no_ice')
+        constants = um_tests.test_common.um_constants
+
+        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
+        self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
     def dFdt(self, F, t, p):
         state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
 
+        ql = F[Var.q_l]
+        # the integrator may have put us below zero, this is non-conservative,
+        # but I don't have any other options here since I can't modify the
+        # integrator's logic
+        if ql < 0.0:
+            ql = 0.0
+            F[Var.q_l] = ql
+
         y = state_mapping.pycloud_um(F, p)
 
-        dydt, _ = unified_microphysics.microphysics_pylib.dqdt(y=y)
+        dydt = unified_microphysics.mphys_no_ice.dydt(y=y, t=0.0)
 
         dFdz, _ = state_mapping.um_pycloud(y=dydt)
 
         return dFdz
-
-    def qv_sat(self, T, p):
-        return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
 
     def __str__(self):
         return "Fortran ('no_ice') model"
