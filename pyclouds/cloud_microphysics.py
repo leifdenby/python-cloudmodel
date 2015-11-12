@@ -7,13 +7,13 @@ import odespy
 from scipy.constants import pi
 
 from pyclouds.cloud_equations import Var
-from common import AttrDict, default_constants, make_related_constants
+from common import AttrDict, default_constants, make_related_constants, ATHAM_constants
 from pyclouds.plotting import plot_hydrometeor_evolution
 from pyclouds import parameterisations
 
 try:
     import unified_microphysics.fortran as unified_microphysics
-    import unified_microphysics.tests as um_tests
+    from unified_microphysics.tests.test_common import um_constants
 except ImportError:
     unified_microphysics = None
 
@@ -428,8 +428,7 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
         if unified_microphysics is None:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
-        unified_microphysics.microphysics_pylib.init('no_ice')
-        constants = um_tests.test_common.um_constants
+        constants = um_constants
 
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
@@ -455,3 +454,90 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
 
     def __str__(self):
         return "Fortran ('no_ice') model"
+
+class ExplicitFortranModel:
+    """
+    Calls the integrator implemented in Fortran in um
+    """
+
+    def __init__(self, *args, **kwargs):
+        if unified_microphysics is None:
+            raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
+
+        constants = um_constants
+
+        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
+        self.qv_sat = self.parameterisations.pv_sat.qv_sat
+
+    def integrate(self, initial_condition, t, p0, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
+        # When integrating the microphysics on it's own we assume constant
+        # pressure which must be provided when integrating
+        self.p0 = p0
+
+        state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
+
+        y = state_mapping.pycloud_um(initial_condition, p0)
+        F = [state_mapping.um_pycloud(y=y)[0],]
+        t_ = [t[0],]
+
+        for tn in range(len(t)-1):
+            # modifies `y` in-place
+            try:
+                unified_microphysics.microphysics_integration.integrate_with_message(y=y, t0=t[tn], t_end=t[tn+1])
+                F.append(state_mapping.um_pycloud(y=y)[0])
+                t_.append(t[tn+1])
+            except Exception as e:
+                print "(%s): Integration stopped, %s" % (str(self), str(e))
+                break
+
+        print len(F), len(t_)
+
+        return HydrometeorEvolution(F=np.array(F), t=np.array(t_), model=self,)
+
+
+    def __str__(self):
+        return "pure fortran `no_ice` model with rkf34"
+
+class OldATHAMKesslerFortran:
+    """
+    Uses refactored implementation of "Kessler microphysics" from ATHAM
+    implemented in the `unified microphysics` codebase.
+    """
+
+    def __init__(self, *args, **kwargs):
+        if unified_microphysics is None:
+            raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
+
+        unified_microphysics.microphysics_pylib.init('kessler_old')
+
+        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=ATHAM_constants)
+        self.qv_sat = self.parameterisations.pv_sat.qv_sat
+
+    def integrate(self, initial_condition, t, p0):
+        self.p0 = p0
+
+        state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
+
+        y = state_mapping.pycloud_um(initial_condition, p0)
+        F = [state_mapping.um_pycloud(y=y)[0],]
+        t_ = [t[0],]
+
+        for tn in range(len(t)-1):
+            # modifies `y` in-place
+            try:
+                unified_microphysics.mphys_kessler_old.integrate(y=y, t0=t[tn], t_end=t[tn+1])
+                F_new = state_mapping.um_pycloud(y=y)[0]
+                F.append(F_new)
+                t_.append(t[tn+1])
+                if F_new[Var.T] < 0.0:
+                    raise ValueError("Temperature became negative")
+            except Exception as e:
+                print "(%s): Integration stopped, %s" % (str(self), str(e))
+                break
+
+
+        return HydrometeorEvolution(F=np.array(F), t=np.array(t_), model=self,)
+
+
+    def __str__(self):
+        return 'old ATHAM "Kessler microphysics"'
