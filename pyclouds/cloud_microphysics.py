@@ -428,6 +428,9 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
         if unified_microphysics is None:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
+
+        unified_microphysics.microphysics_pylib.init('no_ice')
+
         constants = um_constants
 
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
@@ -453,7 +456,7 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
         return dFdz
 
     def __str__(self):
-        return "Fortran ('no_ice') model"
+        return "Fortran ('no_ice') model with odespy integrator"
 
 class ExplicitFortranModel:
     """
@@ -465,6 +468,8 @@ class ExplicitFortranModel:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
         constants = um_constants
+
+        unified_microphysics.microphysics_pylib.init('no_ice')
 
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
