@@ -101,6 +101,19 @@ class Var:
     def print_formatted(v, formatting='%g'):
         print ",\t".join([("%s=" + formatting) % (Var.names[i], v[i]) for i in range(Var.NUM)])
 
+    @staticmethod
+    def repr(v, formatting='%g'):
+        units = { 'w': 'm/s', 'r': 'm', 'T': 'K'}
+        return ", ".join([r"$%s=%g%s$" % (Var.names[i], v[i], units.get(Var.names[i], '')) for i in range(Var.NUM)])
+
+    @staticmethod
+    def make_state(**kwargs):
+        s = np.zeros((Var.NUM))
+        for k, v in kwargs.items():
+            s[getattr(Var, k)] = v
+
+        return s
+
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)

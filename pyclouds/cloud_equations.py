@@ -7,6 +7,7 @@ import numpy as np
 import plotting
 
 from common import AttrDict, Var, default_constants
+import cloud_microphysics
 
 
 class CloudProfile():
@@ -479,6 +480,76 @@ class FullThermodynamicsCloudEquations(CloudModel):
         q_r = F[Var.q_r]
         q_d = 1.0 - q_v - q_l - q_i - q_r
 
+        if q_r > 0.0:
+            import ipdb
+            ipdb.set_trace()
+            raise NotImplementedError
+
+        # cloud is assumed to be at same pressure as in environment
+        p = self.environment.p(z)
+
+        dFdz_ = np.zeros((Var.NUM,))
+        
+
+        # 1. Estimate change in vertical velocity with initial state
+        dwdz_ = self.dw_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i)
+
+        dFdz_[Var.w] = dwdz_
+
+        # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
+        dTdz_s = self.dT_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0)
+
+        dFdz_[Var.T] += dTdz_s
+
+        # 3. estimate new state from phase changes predicted by microphysics
+        dFdt_micro = self.microphysics.dFdt(F, p=p, t=None)
+
+        if np.any(np.isnan(dFdt_micro)):
+            warnings.warn("microphysics returned nan")
+            dFdt_micro = np.zeros(F.shape)
+
+        dFdz_micro = dFdt_micro/w  # w = dz/dt
+        dFdz_ += dFdz_micro
+
+
+        dql_c__dz = dFdz_micro[Var.q_l]
+        dqi_c__dz = dFdz_micro[Var.q_i]
+        dTdz_ = dTdz_s + dFdz_micro[Var.T]
+
+        # 4. Use post microphysics state (and phase changes from microphysics) to estimate radius change
+        drdz_ = self.dr_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, 
+                           qi_c=q_i, dql_c__dz=dql_c__dz, dqi_c__dz=dqi_c__dz, dTc_dz=dTdz_, dw_dz=dwdz_)
+
+        dFdz_[Var.r] = drdz_
+
+
+        return dFdz_
+
+    def __str__(self):
+        return r"FullSpecConcEqns ($D=%g$, $\beta=%g$), mu-phys: %s" % (self.D, self.beta, str(self.microphysics))
+
+
+class FullEquationsSatMicrophysics(FullThermodynamicsCloudEquations):
+    """
+    Same as the full model, but using the moist-adjustment microphysics is hardcoded in
+    """
+    def __init__(self, *args, **kwargs):
+        if 'microphysics' in kwargs:
+            warnings.warn("%s is hardcoded to use the moist adjustment microphysics")
+            kwargs['microphysics'] = cloud_microphysics.MoistAdjustmentMicrophysics()
+        super(FullEquationsSatMicrophysics, self).__init__(*args, **kwargs)
+
+
+    def dFdz(self, F, z):
+        r = F[Var.r]
+        w = F[Var.w]
+        T = F[Var.T]
+        q_v = F[Var.q_v]
+        q_l = F[Var.q_l]
+        q_i = F[Var.q_i]
+        q_r = F[Var.q_r]
+        q_d = 1.0 - q_v - q_l - q_i - q_r
+
         if q_r != 0.0:
             raise NotImplementedError
 
@@ -501,7 +572,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
 
         # 3. With new temperature estimate new state from phase changes predicted by microphysics
-        F_s = self.microphysics(F_s, p=p, dt=None)
+        F_s = self.microphysics._calc_adjusted_state(F_s, p=p, iterations=2)
 
         dTdz_ = F_s[Var.T] - F[Var.T]
         dFdz_[Var.T] = dTdz_
@@ -517,8 +588,4 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         dFdz_[Var.r] = drdz_
 
-
         return dFdz_
-
-    def __str__(self):
-        return r"FullSpecConcEqns ($D=%g$, $\beta=%g$)" % (self.D, self.beta,)

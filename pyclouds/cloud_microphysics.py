@@ -159,8 +159,8 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
 
         return HydrometeorEvolution(F=F, t=t, model=self, integration_kwargs={ 'iterations': iterations, })
 
-    def __call__(self, F, p, dt):
-        return self._calc_adjusted_state(F=F, p=p, iterations=3)
+    def __call__(self, *args, **kwargs):
+        raise Exception("Since moist adjustment is instaneous it cannot be called to provided a differential")
 
     def qv_sat(self, T, p):
         return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
@@ -216,6 +216,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         self.r0 = 0.1e-6  # cloud droplet initial radius
         self.r_crit = r_crit  # critical cloud droplet radius [m] after which the number of cloud droplets is increased
         self.debug = True
+        self.disable_rain = kwargs.get('disable_rain', False)
 
     def calc_mixture_density(self, qd, qv, ql, qi, qr, p, T):
         warnings.warn("EoS calculation stored within microphysics, should really use something defined externally")
@@ -243,7 +244,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         cp_v = self.constants.cp_v
         cp_l = self.constants.cp_l
 
-        if qi != 0.0:
+        if qi > 0.0:
             raise NotImplementedError
 
         return cp_d*qd + (ql + qr)*cp_l + qv*cp_v
@@ -282,6 +283,9 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         dqr_dt_2 = self._dqr_dt__accretion(ql=ql, qg=qg, qr=qr, rho_g=rho_g)
 
         dqr_dt = dqr_dt_1 + dqr_dt_2
+
+        if self.disable_rain:
+            dqr_dt = 0.0
 
         dFdz = np.zeros((Var.NUM))
         dFdz[Var.q_l] =  dql_dt -dqr_dt
@@ -365,9 +369,6 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         return dql_dt
 
-
-    def __call__(self, F, p):
-        pass
 
     def __str__(self):
         return "Finite condensation rate ($r_{crit}=%gm$)" % (self.r_crit)
@@ -494,8 +495,6 @@ class ExplicitFortranModel:
             except Exception as e:
                 print "(%s): Integration stopped, %s" % (str(self), str(e))
                 break
-
-        print len(F), len(t_)
 
         return HydrometeorEvolution(F=np.array(F), t=np.array(t_), model=self,)
 
