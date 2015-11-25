@@ -57,6 +57,71 @@ class CloudModel(object):
         else:
             return False
 
+    def _stopping_criterion_time(self, F_solution, t, k):
+        if hasattr(self, 'stop_integration'):
+            return True
+
+        F_top = F_solution[k]
+        t_top = t[k]
+
+        if F_top[Var.T] > 300.0:
+            print "Integration stopped: temperature got unphysically high"
+            return True
+        elif F_top[Var.T] < 0.0:
+            print "Integration stopped: temperature dropped below zero"
+            return True
+        elif F_top[Var.r] > 100e3:
+            print "Integration stopped: cloud radius became unreasonably high (r>100km)"
+            return True
+        elif F_top[Var.z] < 0.0:
+            print "Integration stopped: height below ground"
+            return True
+        elif F_top[Var.r] < 0.0:
+            print "Integration stopped: radius dropped below zero"
+            return True
+        else:
+            return False
+
+    def dFdt(self, F, t):
+        # print "--> ",
+        # Var.print_formatted(F)
+        w = F[Var.w]
+        z = F[Var.z]
+
+        try:
+            dFdz = self.dFdz(F=F, z=z)
+            dzdt = w
+            dFdt = dFdz*dzdt
+            dFdt[Var.z] = dzdt
+
+            # print "dFdz",
+            # Var.print_formatted(dFdz)
+
+            # print "dFdt=",
+            # Var.print_formatted(dFdt)
+            # print
+        except Exception as e:
+            # TODO: stop integration when exception is raised
+            self.stop_integration = True
+            print "Error: %s" % e.message
+            print "Exception at t=%fs" % t
+            dFdt = np.zeros((Var.NUM,))
+
+        return dFdt
+
+    def integrate_in_time(self, initial_condition, t, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
+        warnings.warn("Integration in time is still experimental")
+
+        solver = SolverClass(self.dFdt, rtol=0.0, atol=tolerance,)
+        solver.set_initial_condition(np.array(initial_condition))
+
+        if stopping_criterion is None:
+            stopping_criterion=self._stopping_criterion_time
+
+        F, t = solver.solve(t, stopping_criterion)
+
+        return CloudProfile(F=F, z=F[:,Var.z], cloud_model=self)
+
     def integrate(self, initial_condition, z, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
         solver = SolverClass(self.dFdz, rtol=0.0, atol=tolerance,)
         solver.set_initial_condition(initial_condition)
@@ -479,11 +544,6 @@ class FullThermodynamicsCloudEquations(CloudModel):
         q_i = F[Var.q_i]
         q_r = F[Var.q_r]
         q_d = 1.0 - q_v - q_l - q_i - q_r
-
-        if q_r > 0.0:
-            import ipdb
-            ipdb.set_trace()
-            raise NotImplementedError
 
         # cloud is assumed to be at same pressure as in environment
         p = self.environment.p(z)

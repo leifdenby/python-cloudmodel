@@ -71,13 +71,14 @@ def hydrometeor_profile_plot(F, z, Te, p_e):
     plot.grid(True)
 
 
-def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram'], initial_condition=None):
-    if len(variables) > 6:
-        raise NotImplementedError
+def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram'], initial_condition=None, labels_ncol=2):
 
     n = len(variables)
     c = n > 3 and 3 or n
     r = n/c
+
+    if n % r > 0:
+        r += 1
 
     gs = gridspec.GridSpec(r, c)
 
@@ -194,13 +195,14 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
         if len(ref_lines) > 0:
             plot.legend(ref_lines, [l.get_label() for l in ref_lines])
 
-    plot.figlegend(lines, [l.get_label() for l in lines], loc = 'lower center', ncol=4, labelspacing=0. )
+    plot.figlegend(lines, [l.get_label() for l in lines], loc = 'lower center', ncol=labels_ncol, labelspacing=0. )
     plot.grid(True)
 
     title = "Vertical cloud profiles"
     if initial_condition is not None:
         title += '\n' + Var.repr(initial_condition)
 
+    fig.subplots_adjust(bottom=0.15)
     plot.suptitle(title)
 
     return fig

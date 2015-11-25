@@ -371,7 +371,10 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
 
     def __str__(self):
-        return "Finite condensation rate ($r_{crit}=%gm$)" % (self.r_crit)
+        s = "Finite condensation rate ($r_{crit}=%gm$)" % (self.r_crit)
+        if self.disable_rain:
+            s += " without rain"
+        return s
 
 class FC_min_radius(FiniteCondensationTimeMicrophysics):
 

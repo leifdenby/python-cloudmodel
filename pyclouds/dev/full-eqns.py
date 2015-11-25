@@ -56,6 +56,9 @@ profiles.append(cloud_model.integrate(initial_condition, z_points))
 cloud_model = cloud_equations.FullEquationsSatMicrophysics(gamma=gamma, D=D+dD, beta=beta+d_beta, **default_kwargs)
 profiles.append(cloud_model.integrate(initial_condition, z_points))
 
+cloud_model = cloud_equations.DryAirOnly(gamma=gamma, D=D+dD, beta=0.0, **default_kwargs)
+profiles.append(cloud_model.integrate(initial_condition, z_points))
+
 fig = plotting.plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'T__tephigram', 'q_l'], initial_condition=initial_condition)
 fig.savefig(output_filename)
 print "output written to %s" % output_filename
