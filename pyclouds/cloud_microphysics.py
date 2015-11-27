@@ -448,8 +448,13 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
         if unified_microphysics is None:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
+        if not 'model_constraint' in kwargs:
+            warnings.warn("`model_constraint` not provided, assuming isometric")
+        model_constraint = kwargs.get('model_constraint', 'isometric')
 
-        unified_microphysics.microphysics_pylib.init('no_ice')
+        self.model_constraint = model_constraint
+
+        unified_microphysics.microphysics_pylib.init('no_ice', model_constraint)
 
         constants = um_constants
 
@@ -469,14 +474,16 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
 
         y = state_mapping.pycloud_um(F, p)
 
-        dydt = unified_microphysics.mphys_no_ice.dydt(y=y, t=0.0)
+        c_m = unified_microphysics.microphysics_pylib.mixture_heat_capacity(y)
+
+        dydt = unified_microphysics.mphys_no_ice.dydt(y=y, t=0.0, c_m=c_m)
 
         dFdz, _ = state_mapping.um_pycloud(y=dydt)
 
         return dFdz
 
     def __str__(self):
-        return "Fortran ('no_ice') model with odespy integrator"
+        return "Fortran 'no_ice' model (%s) with odespy integrator" % self.model_constraint
 
 class ExplicitFortranModel:
     """
@@ -531,7 +538,7 @@ class OldATHAMKesslerFortran:
         if unified_microphysics is None:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
-        unified_microphysics.microphysics_pylib.init('kessler_old')
+        unified_microphysics.microphysics_pylib.init('kessler_old', 'isobaric')
 
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=ATHAM_constants)
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
@@ -548,7 +555,7 @@ class OldATHAMKesslerFortran:
         for tn in range(len(t)-1):
             # modifies `y` in-place
             try:
-                unified_microphysics.mphys_kessler_old.integrate(y=y, t0=t[tn], t_end=t[tn+1])
+                unified_microphysics.mphys_kessler_old.integrate_isobaric(y=y, t0=t[tn], t_end=t[tn+1])
                 F_new = state_mapping.um_pycloud(y=y)[0]
                 F.append(F_new)
                 t_.append(t[tn+1])
