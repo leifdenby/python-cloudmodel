@@ -249,6 +249,22 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         return cp_d*qd + (ql + qr)*cp_l + qv*cp_v
 
+    def cv_m(self, F):
+        qv = F[Var.q_v]
+        ql = F[Var.q_l]
+        qr = F[Var.q_r]
+        qi = F[Var.q_i]
+        qd = 1. - qv - ql - qr - qi
+
+        cv_d = self.constants.cv_d
+        cv_v = self.constants.cv_v
+        cv_l = self.constants.cv_l
+
+        if qi > 0.0:
+            raise NotImplementedError
+
+        return cv_d*qd + (ql + qr)*cv_l + qv*cv_v
+
     def dFdt(self, F, t, p):
         Lv = self.constants.L_v
         cp_d = self.constants.cp_d
