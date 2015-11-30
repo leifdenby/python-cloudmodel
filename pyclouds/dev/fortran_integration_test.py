@@ -23,6 +23,8 @@ initial_condition[Var.q_l] = 2.0e-4
 
 initial_condition[Var.T] = 288.
 p0 = 88676.  # [Pa]
+initial_condition[Var.p] = p0
+
 
 t_ = np.linspace(0., 17., 100)
 
@@ -33,32 +35,13 @@ solutions = []
 # solutions.append(cloud_microphysics.FiniteCondensationTimeMicrophysics(constants=um_constants).integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass))
 # solutions.append(cloud_microphysics.FC_min_radius(constants=um_constants).integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass))
 
-# solutions.append(cloud_microphysics.FortranNoIceMicrophysics().integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass))
-solutions.append(cloud_microphysics.ExplicitFortranModel().integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass))
+model_constraint = 'isobaric'
+solutions.append(cloud_microphysics.ExplicitFortranModel(model_constraint=model_constraint).integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass))
 
+model_constraint = 'isometric'
+solutions.append(cloud_microphysics.ExplicitFortranModel(model_constraint=model_constraint).integrate(initial_condition=initial_condition, t=t_, p0=p0, SolverClass=SolverClass))
 
-#sol2.plot()
-plot = plot_hydrometeor_evolution(solutions, variables=['q_v', 'r_c', 'q_l', 'T',], legend_loc='upper right')
-
-
-# In[ ]:
-
-solution = solutions[0]
-Var.print_formatted(solution.F[-1])
-
-
-# In[ ]:
-
-model = cloud_microphysics.FiniteCondensationTimeMicrophysics(constants=um_constants)
-Var.print_formatted(model.dFdt(F=initial_condition, p=p0, t=0.0))
-
-
-# In[ ]:
-
-print p0
-
-
-# In[ ]:
-
-
-
+plot.ioff()
+plot_hydrometeor_evolution(solutions, variables=['q_v', 'p', 'q_l', 'T', ], legend_loc='upper right')
+plot.show()
+plot.draw()

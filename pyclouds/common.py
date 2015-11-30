@@ -94,8 +94,9 @@ class Var:
     q_l = 5
     q_i = 6
     z = 7
+    p = 8
 
-    names = ['r', 'w', 'T', 'q_v', 'q_r', 'q_l', 'q_i', 'z',]
+    names = ['r', 'w', 'T', 'q_v', 'q_r', 'q_l', 'q_i', 'z', 'p',]
     NUM = len(names)
 
     @staticmethod
@@ -104,7 +105,7 @@ class Var:
 
     @staticmethod
     def repr(v, formatting='%g'):
-        units = { 'w': 'm/s', 'r': 'm', 'T': 'K', 'z': 'm',}
+        units = { 'w': 'm/s', 'r': 'm', 'T': 'K', 'z': 'm', 'p': 'Pa',}
         return ", ".join([r"$%s=%g%s$" % (Var.names[i], v[i], units.get(Var.names[i], '')) for i in range(Var.NUM)])
 
     @staticmethod

@@ -14,6 +14,7 @@ from pyclouds import parameterisations
 try:
     import unified_microphysics.fortran as unified_microphysics
     from unified_microphysics.tests.test_common import um_constants
+    from unified_microphysics.utils import PyCloudsUnifiedMicrophysicsStateMapping
 except ImportError:
     unified_microphysics = None
 
@@ -22,56 +23,6 @@ except ImportError:
 # except ImportError:
     # # import pure python version instead
 from ccfm.ccfmpython import microphysics as ccfm_microphysics
-
-class PyCloudsUnifiedMicrophysicsStateMapping():
-    """
-    Utility for providing mapping between pycloud state representation and
-    unified-microphysics model representation.
-
-    TODO: Make pyclouds use indexing from `unified microphysics`
-    
-    XXX: this is kinda hacky, I only reassign state variables that are actually
-    used in the initialized model in `unified microphysics`
-    """
-    def __init__(self):
-        register = unified_microphysics.microphysics_register
-        # Fortran indexing starts at 1
-        self.idx_water_vapour = register.idx_water_vapour-1
-        self.idx_cwater = register.idx_cwater-1
-        self.idx_rain = register.idx_rain-1
-        self.idx_cice = register.idx_cice-1
-        self.idx_temp = register.idx_temp-1
-        self.idx_pressure = register.idx_pressure-1
-
-        self.n_vars = register.n_variables
-
-    def um_pycloud(self, y):
-        F = np.zeros((Var.NUM))
-        if self.idx_water_vapour != -1:
-            F[Var.q_v] = y[self.idx_water_vapour]
-        if self.idx_cwater != -1:
-            F[Var.q_l] = y[self.idx_cwater]
-        if self.idx_rain != -1:
-            F[Var.q_r] = y[self.idx_rain]
-        if self.idx_cice != -1:
-            F[Var.q_i] = y[self.idx_cice]
-        F[Var.T] = y[self.idx_temp]
-        return F, y[self.idx_pressure]
-
-    def pycloud_um(self, F, p):
-        y = np.zeros((self.n_vars,))
-
-        if self.idx_water_vapour != -1:
-            y[self.idx_water_vapour] = F[Var.q_v]
-        if self.idx_cwater != -1:
-            y[self.idx_cwater] = F[Var.q_l]
-        if self.idx_rain != -1:
-            y[self.idx_rain] = F[Var.q_r]
-        if self.idx_cice != -1:
-            y[self.idx_cice] = F[Var.q_i]
-        y[self.idx_temp] = F[Var.T]
-        y[self.idx_pressure] = p
-        return y
 
 class HydrometeorEvolution:
     def __init__(self, F, t, model, integration_kwargs={}, extra_vars={}):
@@ -94,6 +45,10 @@ class BaseMicrophysicsModel(object):
     def __init__(self, constants=default_constants, *args, **kwargs):
         constants = make_related_constants(constants)
 
+        if not 'model_constraint' in kwargs:
+            warnings.warn("`model_constraint` not provided, assuming isometric")
+        self.model_constraint = kwargs.get('model_constraint', 'isometric')
+
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.constants = AttrDict(constants)
 
@@ -103,12 +58,11 @@ class BaseMicrophysicsModel(object):
     def _stopping_criterion(self, F_solution, t, k):
         return False
 
-    def integrate(self, initial_condition, t, p0, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
+    def integrate(self, initial_condition, t, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
         # When integrating the microphysics on it's own we assume constant
         # pressure which must be provided when integrating
-        self.p0 = p0
         self.extra_vars = {}
-        derriv_f = lambda F, t: self.dFdt(F=F, p=p0, t=t)
+        derriv_f = lambda F, t: self.dFdt(F=F, t=t)
         solver = SolverClass(derriv_f, rtol=0.0, atol=tolerance,)
         solver.set_initial_condition(initial_condition)
 
@@ -118,18 +72,18 @@ class BaseMicrophysicsModel(object):
 
         return HydrometeorEvolution(F=F, t=t, model=self, extra_vars=self.extra_vars,)
 
-    def __call__(self, F, p, dt):
-        return self.dFdt(F=F, p=p)*dt
+    def __call__(self, F, dt):
+        return self.dFdt(F=F)*dt
 
 class DummyMicrophysics(BaseMicrophysicsModel):
     """
     Dummy microphysics implementation that doesn't affect the state at all.
     """
 
-    def dFdt(self, F, p):
+    def dFdt(self, F):
         return np.zeros((Var.NUM))
 
-    def __call__(self, F, p, dt):
+    def __call__(self, F, dt):
         return F
 
 class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
@@ -140,17 +94,15 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
     Uses `moist_adjust` method from `mo_ccfm_cloudbase.f90`
     """
 
-    def integrate(self, initial_condition, t, p0, iterations=1, *args, **kwargs):
+    def integrate(self, initial_condition, t, iterations=1, *args, **kwargs):
         """
         Fake integrate method, moist adjustment instantenously turns all supersaturation into condensed water.
         """
 
-        self.p0 = p0
-
         F0 = initial_condition
         F = np.zeros((len(t), Var.NUM))
         F[0] = initial_condition
-        F_adjusted = self._calc_adjusted_state(F=F0, p=p0, iterations=iterations)
+        F_adjusted = self._calc_adjusted_state(F=F0, iterations=iterations)
 
         if F_adjusted[Var.q_l] < 0.0:
             F[1:] = F0
@@ -165,7 +117,7 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
     def qv_sat(self, T, p):
         return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
 
-    def _calc_adjusted_state(self, F, p, iterations):
+    def _calc_adjusted_state(self, F, iterations):
         """
         Calculate approximation saturation state using first-order Taylor
         expansion of the moist enthalpy equation at constant pressure:
@@ -176,6 +128,8 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         """
         cp_d = self.constants.cp_d
         cp_v = self.constants.cp_v
+        cv_d = self.constants.cv_d
+        cv_v = self.constants.cv_v
         L_v = self.constants.L_v
 
         qv = F[Var.q_v]
@@ -185,18 +139,26 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         qd = 1. - qv - ql - qr - qi
 
         T = F[Var.T]
+        p = F[Var.p]
         qv = F[Var.q_v]
 
         for n in range(iterations):
-            cp_m = cp_d*qd + (ql + qr + qi + qv)*cp_v
+
+            if self.model_constraint == 'isometric':
+                c_m = cv_d*qd + (ql + qr + qi + qv)*cv_v
+            elif self.model_constraint == 'isobaric':
+                c_m = cp_d*qd + (ql + qr + qi + qv)*cp_v
+            else:
+                raise NotImplementedError("Model constraint mode '%s' not implemented" % self.model_constraint)
+
             qv_sat = self.parameterisations.pv_sat.qv_sat(T=T, p=p)
             dqv_sat__dT = self.parameterisations.pv_sat.dqv_sat__dT(T=T, p=p)
 
-            dT = L_v/cp_m*(qv - qv_sat)/(1 + L_v/cp_m*dqv_sat__dT)
+            dT = L_v/c_m*(qv - qv_sat)/(1 + L_v/c_m*dqv_sat__dT)
 
             T = T+dT
-            qv = qv - cp_m/L_v*dT
-            ql = ql + cp_m/L_v*dT
+            qv = qv - c_m/L_v*dT
+            ql = ql + c_m/L_v*dT
 
         Fs = np.copy(F)
         Fs[Var.q_v] = qv
@@ -206,7 +168,7 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         return Fs
 
     def __str__(self):
-        return "Moist adjustment"
+        return "Moist adjustment (%s)" % self.model_constraint
 
 class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
     def __init__(self, r_crit=5.0e-6, *args, **kwargs):
@@ -265,7 +227,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         return cv_d*qd + (ql + qr)*cv_l + qv*cv_v
 
-    def dFdt(self, F, t, p):
+    def dFdt(self, F, t):
         Lv = self.constants.L_v
         cp_d = self.constants.cp_d
         cp_v = self.constants.cp_v
@@ -284,8 +246,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         qd = 1. - qv - ql - qr - qi
         T = F[Var.T]
-
-        cp_m = self.cp_m(F=F)
+        p = F[Var.p]
 
         # mixture density
         rho = self.calc_mixture_density(qd=qd, qv=qv, ql=ql, qi=qi, qr=qr, p=p, T=T)
@@ -307,7 +268,15 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         dFdz[Var.q_l] =  dql_dt -dqr_dt
         dFdz[Var.q_v] = -dql_dt
         dFdz[Var.q_r] =          dqr_dt
-        dFdz[Var.T] = Lv/cp_m*dql_dt
+
+        if self.model_constraint == 'isometric':
+            c_m = self.cv_m(F=F)
+        elif self.model_constraint == 'isobaric':
+            c_m = self.cp_m(F=F)
+        else:
+            raise NotImplementedError("Model constraint mode '%s' not implemented" % self.model_constraint)
+
+        dFdz[Var.T] = Lv/c_m*dql_dt
 
         if self.debug and hasattr(self, 'extra_vars'):
             self.extra_vars.setdefault('t_substeps', []).append(t)
@@ -387,7 +356,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
 
     def __str__(self):
-        s = "Finite condensation rate ($r_{crit}=%gm$)" % (self.r_crit)
+        s = "Finite condensation rate ($r_{crit}=%gm$, %s)" % (self.r_crit, self.model_constraint)
         if self.disable_rain:
             s += " without rain"
         return s
@@ -448,20 +417,14 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
         if unified_microphysics is None:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
-        if not 'model_constraint' in kwargs:
-            warnings.warn("`model_constraint` not provided, assuming isometric")
-        model_constraint = kwargs.get('model_constraint', 'isometric')
-
-        self.model_constraint = model_constraint
-
-        unified_microphysics.microphysics_pylib.init('no_ice', model_constraint)
+        unified_microphysics.microphysics_pylib.init('no_ice', self.model_constraint)
 
         constants = um_constants
 
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
-    def dFdt(self, F, t, p):
+    def dFdt(self, F, t):
         state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
 
         ql = F[Var.q_l]
@@ -472,13 +435,13 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
             ql = 0.0
             F[Var.q_l] = ql
 
-        y = state_mapping.pycloud_um(F, p)
+        y = state_mapping.pycloud_um(F)
 
         c_m = unified_microphysics.microphysics_pylib.mixture_heat_capacity(y)
 
         dydt = unified_microphysics.mphys_no_ice.dydt(y=y, t=0.0, c_m=c_m)
 
-        dFdz, _ = state_mapping.um_pycloud(y=dydt)
+        dFdz = state_mapping.um_pycloud(y=dydt)
 
         return dFdz
 
@@ -490,33 +453,30 @@ class ExplicitFortranModel:
     Calls the integrator implemented in Fortran in um
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, model_constraint, *args, **kwargs):
         if unified_microphysics is None:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
         constants = um_constants
+        self.model_constraint = model_constraint
 
-        unified_microphysics.microphysics_pylib.init('no_ice')
+        unified_microphysics.microphysics_pylib.init('no_ice', model_constraint)
 
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
-    def integrate(self, initial_condition, t, p0, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
-        # When integrating the microphysics on it's own we assume constant
-        # pressure which must be provided when integrating
-        self.p0 = p0
-
+    def integrate(self, initial_condition, t, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
         state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
 
-        y = state_mapping.pycloud_um(initial_condition, p0)
-        F = [state_mapping.um_pycloud(y=y)[0],]
+        y = state_mapping.pycloud_um(initial_condition)
+        F = [state_mapping.um_pycloud(y=y),]
         t_ = [t[0],]
 
         for tn in range(len(t)-1):
             # modifies `y` in-place
             try:
-                unified_microphysics.microphysics_integration.integrate_with_message(y=y, t0=t[tn], t_end=t[tn+1])
-                F.append(state_mapping.um_pycloud(y=y)[0])
+                unified_microphysics.microphysics_pylib.integrate_microphysics(y=y, t=t[tn], t_end=t[tn+1])
+                F.append(state_mapping.um_pycloud(y=y))
                 t_.append(t[tn+1])
             except Exception as e:
                 print "(%s): Integration stopped, %s" % (str(self), str(e))
@@ -526,7 +486,7 @@ class ExplicitFortranModel:
 
 
     def __str__(self):
-        return "pure fortran `no_ice` model with rkf34"
+        return "fortran-only `no_ice` with rkf34 (%s)" % self.model_constraint
 
 class OldATHAMKesslerFortran:
     """
@@ -534,35 +494,41 @@ class OldATHAMKesslerFortran:
     implemented in the `unified microphysics` codebase.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, model_constraint='isometric', *args, **kwargs):
         if unified_microphysics is None:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
-        unified_microphysics.microphysics_pylib.init('kessler_old', 'isobaric')
+        if model_constraint != 'isometric':
+            raise Exception("The old Kessler microphysics can only be run in isometric mode")
+
+        unified_microphysics.microphysics_pylib.init('kessler_old', model_constraint)
 
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=ATHAM_constants)
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
-    def integrate(self, initial_condition, t, p0):
-        self.p0 = p0
-
+    def integrate(self, initial_condition, t):
         state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
 
-        y = state_mapping.pycloud_um(initial_condition, p0)
-        F = [state_mapping.um_pycloud(y=y)[0],]
+        y = state_mapping.pycloud_um(initial_condition)
+        F = [state_mapping.um_pycloud(y=y),]
         t_ = [t[0],]
 
         for tn in range(len(t)-1):
             # modifies `y` in-place
             try:
+                # XXX: I haven't finished writing state mapping for ice yet, so this big fails, just fake it for now...
+                if F[-1][Var.T] < 273.15:
+                    raise NotImplementedError("Wrapper for old Kessler microphysics isn't written to handle ice yet")
+
                 unified_microphysics.mphys_kessler_old.integrate_isobaric(y=y, t0=t[tn], t_end=t[tn+1])
-                F_new = state_mapping.um_pycloud(y=y)[0]
+                F_new = state_mapping.um_pycloud(y=y)
                 F.append(F_new)
                 t_.append(t[tn+1])
                 if F_new[Var.T] < 0.0:
                     raise ValueError("Temperature became negative")
             except Exception as e:
                 print "(%s): Integration stopped, %s" % (str(self), str(e))
+                raise
                 break
 
 
@@ -570,4 +536,4 @@ class OldATHAMKesslerFortran:
 
 
     def __str__(self):
-        return 'old ATHAM "Kessler microphysics"'
+        return 'old ATHAM "Kessler microphysics" (isometric)'

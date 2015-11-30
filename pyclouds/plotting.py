@@ -260,7 +260,7 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
                 plot.ylabel('water vapour specific concentration [kg/kg]')
 
                 T = evolution.F[:,Var.T]
-                p = evolution.model.p0
+                p = evolution.F[:,Var.p]
                 if hasattr(evolution.model, 'qv_sat'):
                     q_v__sat = evolution.model.qv_sat(T=T, p=p)
                 else:
@@ -278,6 +278,8 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
                 plot.ylabel('Temperature [K]')
             elif v == 'q_r':
                 plot.ylabel('rain specific concentration [kg/kg]')
+            elif v == 'p':
+                plot.ylabel('pressure [Pa]')
 
         d_data = 0.1*(data_max-data_min)
         d_t = 0.1*t_max
@@ -288,5 +290,8 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
         plot.grid(True)
 
         leg = plot.legend(loc=legend_loc)
-        leg.get_frame().set_alpha(0.8)
+        try:
+            leg.get_frame().set_alpha(0.8)
+        except AttributeError:
+            pass
     return fig

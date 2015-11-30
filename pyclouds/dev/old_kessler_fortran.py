@@ -41,7 +41,4 @@ solutions.append(cloud_microphysics.OldATHAMKesslerFortran().integrate(initial_c
 
 # In[ ]:
 
-import ipdb
-ipdb.set_trace()
-
 
