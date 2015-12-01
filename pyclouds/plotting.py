@@ -208,7 +208,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
     return fig
 
 
-def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right'):
+def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right', initial_condition=None):
     n = len(variables)
 
     gs = gridspec.GridSpec(n, 1)
@@ -294,4 +294,12 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
             leg.get_frame().set_alpha(0.8)
         except AttributeError:
             pass
+
+    title = "Hydrometeor evolution"
+    if initial_condition is not None:
+        title += '\n' + Var.repr(initial_condition, skip=['r', 'w', 'z', ])
+
+    plot.suptitle(title)
+    fig.subplots_adjust(top=0.95)
+
     return fig

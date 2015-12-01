@@ -104,9 +104,10 @@ class Var:
         print ",\t".join([("%s=" + formatting) % (Var.names[i], v[i]) for i in range(Var.NUM)])
 
     @staticmethod
-    def repr(v, formatting='%g'):
-        units = { 'w': 'm/s', 'r': 'm', 'T': 'K', 'z': 'm', 'p': 'Pa',}
-        return ", ".join([r"$%s=%g%s$" % (Var.names[i], v[i], units.get(Var.names[i], '')) for i in range(Var.NUM)])
+    def repr(v, formatting='%g', skip=[]):
+        units = { 'w': 'm/s', 'r': 'm', 'T': 'K', 'z': 'm', 'p': 'Pa',
+                }
+        return ", ".join([r"$%s=%g%s$" % (Var.names[i], v[i], units.get(Var.names[i], '')) for i in range(Var.NUM) if not Var.names[i] in skip])
 
     @staticmethod
     def make_state(**kwargs):
