@@ -132,6 +132,13 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         cv_v = self.constants.cv_v
         L_v = self.constants.L_v
 
+        # only needed for isometric integration, where we use equation of state
+        # to update pressure
+        rho_l = self.constants.rho_l
+        rho_i = self.constants.rho_i
+        R_d = self.constants.R_d
+        R_v = self.constants.R_v
+
         qv = F[Var.q_v]
         ql = F[Var.q_l]
         qr = F[Var.q_r]
@@ -143,6 +150,7 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         qv = F[Var.q_v]
 
         for n in range(iterations):
+            rho = 1.0/((qd*R_d + qv*R_v)*T/p + ql/rho_l + qi/rho_i)
 
             if self.model_constraint == 'isometric':
                 c_m = cv_d*qd + (ql + qr + qi + qv)*cv_v
@@ -160,10 +168,15 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
             qv = qv - c_m/L_v*dT
             ql = ql + c_m/L_v*dT
 
+            if self.model_constraint == 'isometric':
+                # rho is unchanged, update pressure
+                p = T*(qd*R_d + qv*R_v)/(1./rho - ql/rho_l - qi/rho_i)
+
         Fs = np.copy(F)
         Fs[Var.q_v] = qv
         Fs[Var.q_l] = ql
         Fs[Var.T] = T
+        Fs[Var.p] = p
 
         return Fs
 
