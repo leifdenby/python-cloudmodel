@@ -22,14 +22,14 @@ def test__acceleration_by_latent_heat():
     # p, r, w, T, q_v, q_r, q_l, q_i
 
     beta = 0.0
-    microphysics = cloud_microphysics.MoistAdjustmentMicrophysics()
+    microphysics = cloud_microphysics.FiniteCondensationTimeMicrophysics()
 
     cloud_model = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=beta, microphysics=microphysics)
     
-    initial_condition = [500.0, w0, T0, 0.0, 0., 0., 0.]
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0.)
     profile_dry_parcel = cloud_model.integrate(initial_condition, z_points)
 
-    initial_condition = [500.0, w0, T0, 0.012, 0., 0., 0.]
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.012, q_l=0., q_r=0., q_i=0.)
     profile_moist_parcel = cloud_model.integrate(initial_condition, z_points)
 
     assert profile_dry_parcel.z[-1] < profile_moist_parcel.z[-1]
@@ -50,7 +50,7 @@ def test__drag():
 
     microphysics = cloud_microphysics.DummyMicrophysics()
     
-    initial_condition = [500.0, w0, T0, 0.0, 0., 0., 0.]
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0.)
 
     cloud_model = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics)
     profile_no_drag = cloud_model.integrate(initial_condition, z_points)
@@ -74,23 +74,21 @@ def test__entrainment():
 
     microphysics = cloud_microphysics.DummyMicrophysics()
     
-    initial_condition = [500.0, w0, T0, 0.0, 0., 0., 0.]
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0.)
 
-
-    cloud_model_with_entrainment = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=0.2, microphysics=microphysics)
     cloud_model_no_entrainment = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics)
+    cloud_model_with_entrainment = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=0.2, microphysics=microphysics)
     cloud_model_dry = cloud_equations.DryAirOnly(environment=environment, gamma=0.0, D=0.0, beta=0.2, microphysics=microphysics)
 
     dFdz1 = cloud_model_no_entrainment.dFdz(initial_condition, 0.0)
     dFdz2 = cloud_model_with_entrainment.dFdz(initial_condition, 0.0)
     dFdz_dry = cloud_model_with_entrainment.dFdz(initial_condition, 0.0)
 
-    # since only dry air is being entrained the effect of entrainment should
-    # not effect the temperature, since the moist static energy of the
-    # environment and the cloud will be the same
-    assert dFdz1[Var.T] == dFdz2[Var.T]
+    # although only dry air is being entrained the effect of entrainment will
+    # change the temperature as the entrained air will be cooler
+    assert dFdz1[Var.T] > dFdz2[Var.T]
 
-    # effect on moment should be the same for dry and moist models
+    # effect on momentum should be the same for dry and moist models
     assert abs(dFdz1[Var.w] - dFdz_dry[Var.w]) < 1.e-4
 
     profile_with_entrainment__dry_model = cloud_model_dry.integrate(initial_condition, z_points)

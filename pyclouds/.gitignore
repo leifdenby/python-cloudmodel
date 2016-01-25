@@ -2,3 +2,4 @@ unified_microphysics.so
 .cache/
 *.mod
 *.so
+tests/.cache/

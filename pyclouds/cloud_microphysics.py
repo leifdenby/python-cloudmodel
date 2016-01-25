@@ -52,8 +52,8 @@ class BaseMicrophysicsModel(object):
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.constants = AttrDict(constants)
 
-    def dFdt(F, t):
-        raise NotImplemented
+    def dFdt(self, F, t):
+        raise NotImplementedError("All microphysics implementations must implement this method")
 
     def _stopping_criterion(self, F_solution, t, k):
         return False
@@ -80,7 +80,7 @@ class DummyMicrophysics(BaseMicrophysicsModel):
     Dummy microphysics implementation that doesn't affect the state at all.
     """
 
-    def dFdt(self, F):
+    def dFdt(self, F, t):
         return np.zeros((Var.NUM))
 
     def __call__(self, F, dt):

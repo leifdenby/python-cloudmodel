@@ -562,7 +562,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         dFdz_[Var.T] += dTdz_s
 
         # 3. estimate new state from phase changes predicted by microphysics
-        dFdt_micro = self.microphysics.dFdt(F, p=p, t=None)
+        dFdt_micro = self.microphysics.dFdt(F, t=None)
 
         if np.any(np.isnan(dFdt_micro)):
             warnings.warn("microphysics returned nan")
