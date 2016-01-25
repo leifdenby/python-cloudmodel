@@ -18,11 +18,11 @@ def test__drag():
 
     w0 = 0.1
     T0 = environment.temp(0.0) + 0.2
-    # p, r, w, T, q_v, q_r, q_l, q_i
+    p0 = environment.p(0.0)
 
     microphysics = cloud_microphysics.DummyMicrophysics()
     
-    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0.)
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0., p=p0)
 
     cloud_model = cloud_equations.DryAirOnly(environment=environment, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics)
     profile_no_drag = cloud_model.integrate(initial_condition, z_points)
@@ -42,11 +42,12 @@ def test__entrainment():
 
     w0 = 0.1
     T0 = environment.temp(0.0) + 0.2
+    p0 = environment.p(0.0)
     # p, r, w, T, q_v, q_r, q_l, q_i
 
     microphysics = cloud_microphysics.DummyMicrophysics()
     
-    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0.)
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0., p=p0)
 
     cloud_model = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics)
     profile_no_entrainment = cloud_model.integrate(initial_condition, z_points)

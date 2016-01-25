@@ -19,6 +19,7 @@ def test__acceleration_by_latent_heat():
 
     w0 = 0.1
     T0 = environment.temp(0.0) + 0.2
+    p0 = environment.p(0.0)
     # p, r, w, T, q_v, q_r, q_l, q_i
 
     beta = 0.0
@@ -26,11 +27,11 @@ def test__acceleration_by_latent_heat():
 
     cloud_model = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=beta, microphysics=microphysics)
     
-    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0.)
-    profile_dry_parcel = cloud_model.integrate(initial_condition, z_points)
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0., p=p0)
+    profile_dry_parcel = cloud_model.integrate(initial_condition, z_points, fail_on_nan=True)
 
-    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.012, q_l=0., q_r=0., q_i=0.)
-    profile_moist_parcel = cloud_model.integrate(initial_condition, z_points)
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.012, q_l=0., q_r=0., q_i=0., p=p0)
+    profile_moist_parcel = cloud_model.integrate(initial_condition, z_points, fail_on_nan=True)
 
     assert profile_dry_parcel.z[-1] < profile_moist_parcel.z[-1]
 
@@ -46,11 +47,12 @@ def test__drag():
 
     w0 = 0.1
     T0 = environment.temp(0.0) + 0.2
+    p0 = environment.p(0.0)
     # p, r, w, T, q_v, q_r, q_l, q_i
 
     microphysics = cloud_microphysics.DummyMicrophysics()
     
-    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0.)
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0., p=p0)
 
     cloud_model = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics)
     profile_no_drag = cloud_model.integrate(initial_condition, z_points)
@@ -70,11 +72,12 @@ def test__entrainment():
 
     w0 = 0.1
     T0 = environment.temp(0.0) + 0.2
+    p0 = environment.p(0.0)
     # p, r, w, T, q_v, q_r, q_l, q_i
 
     microphysics = cloud_microphysics.DummyMicrophysics()
     
-    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0.)
+    initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.0, q_l=0., q_r=0., q_i=0., p=p0)
 
     cloud_model_no_entrainment = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics)
     cloud_model_with_entrainment = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=0.2, microphysics=microphysics)
@@ -103,3 +106,25 @@ def test__entrainment():
 
     # entraining ambient are with a dry plume should cause the plume to reach a lower height
     assert profile_with_entrainment.z[-1] < profile_no_entrainment.z[-1]
+
+# def test__finite_condensation_time_microphysics():
+    # """
+    # Without entrainment of ambient air a moist parcel will rise much further
+    # than a dry parcel if the moist parcel reaches saturation, as the moist
+    # parcel will warm up from latent heat release.
+    # """
+    # environment = stratification_profiles.Soong1973Dry()
+
+    # z_points = np.linspace(100., 4e3, 500)
+
+    # w0 = 0.1
+    # T0 = environment.temp(0.0) + 0.2
+    # # p, r, w, T, q_v, q_r, q_l, q_i
+
+    # beta = 0.2
+    # microphysics = cloud_microphysics.FiniteCondensationTimeMicrophysics()
+
+    # cloud_model = CloudModel(environment=environment, gamma=0.0, D=0.0, beta=beta, microphysics=microphysics)
+
+    # initial_condition = Var.make_state(r=500.0, w=w0, T=T0, q_v=0.012, q_l=0., q_r=0., q_i=0.)
+    # profile_moist_parcel = cloud_model.integrate(initial_condition, z_points)

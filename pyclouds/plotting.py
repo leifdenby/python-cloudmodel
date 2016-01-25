@@ -2,6 +2,7 @@ import matplotlib.pyplot as plot
 import matplotlib.gridspec as gridspec
 import numpy as np
 import warnings
+import math
 
 try:
     from tephigram_python.tephigram_plotter import Tephigram
@@ -71,14 +72,11 @@ def hydrometeor_profile_plot(F, z, Te, p_e):
     plot.grid(True)
 
 
-def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram'], initial_condition=None, labels_ncol=2):
+def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram'], initial_condition=None, labels_ncol=2, label_f=None):
 
     n = len(variables)
     c = n > 3 and 3 or n
-    r = n/c
-
-    if n % r > 0:
-        r += 1
+    r = int(math.ceil(float(n)/c))
 
     gs = gridspec.GridSpec(r, c)
 
@@ -139,11 +137,18 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 plot.title("Tephigram")
 
             else:
-                profile_line = plot.plot(profile_data, profile.z, label=str(profile), marker='.', linestyle='',)
+                if label_f is not None:
+                    label = label_f(profile)
+                else:
+                    label = str(profile)
+
+                profile_line = plot.plot(profile_data, profile.z, label=label, marker='.', linestyle='',)
                 plot.grid(True)
 
                 if n == 0:
                     lines += profile_line
+
+                d_max = max(max(profile_data), d_max)
 
                 if v == 'T':
                     plot.xlabel('temperature [K]')
@@ -153,13 +158,13 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     plot.ylabel('height [m]')
                     plot.xlabel('radius [m]')
                     plot.xlim(0., None)
+                    scale_by_max = True
                 elif v == 'w':
                     plot.ylabel('height [m]')
                     plot.xlabel('vertical velocity [m/s]')
                 elif v == 'q_v':
                     plot.ylabel('height [m]')
                     plot.xlabel('water vapor specific concentration [kg/kg]')
-                    d_max = max(max(profile_data), d_max)
                     scale_by_max = True
 
                     T = profile.F[:,Var.T]
@@ -171,23 +176,21 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 elif v == 'q_l':
                     plot.ylabel('height [m]')
                     plot.xlabel('liquid water specific concentration [kg/kg]')
-                    d_max = max(max(profile_data), d_max)
                     scale_by_max = True
                 elif v == 'q_r':
                     plot.ylabel('height [m]')
                     plot.xlabel('rain water specific concentration [kg/kg]')
-                    d_max = max(max(profile_data), d_max)
                     scale_by_max = True
                 elif v == 'mse':
                     plot.ylabel('height [m]')
                     plot.xlabel('Moist static energy [kJ]')
-                    d_max = max(max(profile_data), d_max)
                 else:
                     raise NotImplementedError
 
         if scale_by_max and d_max != 0.0:
             dx = 0.1*d_max
             plot.xlim(0.-dx,d_max+dx)
+        plot.ylim(0., None)
 
         if ref_plot_func is not None:
             ref_lines += ref_plot_func()

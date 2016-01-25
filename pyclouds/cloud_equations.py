@@ -54,6 +54,11 @@ class CloudModel(object):
         elif z_top > 30e3:
             print "Integration stopped: height reached too high (z > 30km)"
             return True
+        elif np.any(np.isnan(F_top)):
+            print "Integration stopped: solution became nan"
+            if self.fail_on_nan:
+                raise Exception("Solution became nan")
+            return True
         else:
             return False
 
@@ -109,8 +114,17 @@ class CloudModel(object):
 
         return dFdt
 
+    @staticmethod
+    def _validate_initial_state(F):
+        if F[Var.T] == 0.0:
+            raise Exception("Should have temperature > 0.0")
+        if F[Var.p] == 0.0:
+            raise Exception("Should have pressure > 0.0")
+
     def integrate_in_time(self, initial_condition, t, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
         warnings.warn("Integration in time is still experimental")
+
+        self._validate_initial_state(initial_condition)
 
         solver = SolverClass(self.dFdt, rtol=0.0, atol=tolerance,)
         solver.set_initial_condition(np.array(initial_condition))
@@ -122,9 +136,12 @@ class CloudModel(object):
 
         return CloudProfile(F=F, z=F[:,Var.z], cloud_model=self)
 
-    def integrate(self, initial_condition, z, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
+    def integrate(self, initial_condition, z, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3, fail_on_nan=False):
+        self._validate_initial_state(initial_condition)
+
         solver = SolverClass(self.dFdz, rtol=0.0, atol=tolerance,)
         solver.set_initial_condition(initial_condition)
+        self.fail_on_nan = fail_on_nan
 
         if stopping_criterion is None:
             stopping_criterion=self._stopping_criterion
@@ -419,18 +436,6 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         return 1.0/w_c * (g/(1.+self.gamma)*B - mu*w_c**2. - self.D*w_c**2./r_c)
 
-
-    def __environment_state(self, z):
-        """
-        Calculate the environmental state at height z.
-        """
-
-        # XXX: Environment is assumed to only have dry air for now, so all
-        # hydrometeor specific concentrations are zero
-        F = np.zeros((Var.NUM))
-        F[Var.T] = self.environment.temp(z)
-        return F
-
     def dT_dz(self, z, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz):
         """
         Constants:
@@ -563,10 +568,6 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         # 3. estimate new state from phase changes predicted by microphysics
         dFdt_micro = self.microphysics.dFdt(F, t=None)
-
-        if np.any(np.isnan(dFdt_micro)):
-            warnings.warn("microphysics returned nan")
-            dFdt_micro = np.zeros(F.shape)
 
         dFdz_micro = dFdt_micro/w  # w = dz/dt
         dFdz_ += dFdz_micro
