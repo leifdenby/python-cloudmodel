@@ -34,6 +34,16 @@ contains
    !> Compute vertical derivate of full state-vector describing the cloud-parcel state `F` 
    !> given the environmental conditions
    function dFdz(F, T_e, p_e, rho_e)
+      use microphysics_register, only: i_T_mphys => idx_temp
+      use microphysics_register, only: i_p_mphys => idx_pressure
+      use microphysics_register, only: i_qv_mphys => idx_water_vapour
+      use microphysics_register, only: i_ql_mphys => idx_cwater
+      use microphysics_register, only: i_qr_mphys => idx_rain
+      use microphysics_register, only: i_qi_mphys => idx_cice
+
+      ! TODO: get this from some pointer instead
+      use isobaric_integration_helpers, only: dydt_mphys => dydt_isobaric
+
       ! TODO: remove this when I've found out how to get f2py to use module variables
       integer, parameter :: dp = selected_real_kind(12)
 
@@ -50,6 +60,12 @@ contains
       ! for holding the two contributions to temperature changes:
       ! adiabatic expansion + entrainment and phase changes (microphysics)
       real(dp) :: dTdz_ae, dTdz_mphys
+
+      ! For holding the state given to and return from the microphysics
+      ! TODO: the explicit number here shouldn't be necessary
+      real(dp) :: y(8), dydt(8)
+
+      real(dp) :: cm_m_p
 
       z = F(i_z)
       r = F(i_r)
@@ -71,11 +87,23 @@ contains
       dFdz(i_w) = dw_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, rho_e=rho_e)
 
       ! 2. Estimate changes from microphysics
-      ! TODO
-      dFdz(i_qv) = 0.0_dp
-      dFdz(i_ql) = 0.0_dp
-      dFdz(i_qr) = 0.0_dp
-      dFdz(i_qi) = 0.0_dp
+      ! (need to create state vector to supply to migrophysics)
+      y = 0.0
+      y(i_p_mphys) = p
+      y(i_T_mphys) = T
+      y(i_qv_mphys) = q_v
+      y(i_ql_mphys) = q_l
+      y(i_qr_mphys) = q_r
+      y(i_qi_mphys) = q_i
+
+      dydt = dydt_mphys(t=0.0_dp, y=y)
+
+      ! w = dz/dt => dy/dt * 1/w = dy/dt * dt/dz = dy/dz
+      dFdz(i_qv) = dydt(i_qv_mphys)/w
+      dFdz(i_ql) = dydt(i_ql_mphys)/w
+      dFdz(i_qr) = dydt(i_qr_mphys)/w
+      dFdz(i_qi) = dydt(i_qi_mphys)/w
+
 
       ! 3. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
       dTdz_ae = dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, &
@@ -88,6 +116,7 @@ contains
 
 
    end function
+
 
    !> Compute the mixture density from the full equation of state
    pure function mod__cloud_mixture_density_from_eos(p, T_c, qd_c, qv_c, ql_c, qi_c) result(rho)
