@@ -280,13 +280,13 @@ class FullThermodynamicsCloudEquations(CloudModel):
     ...
 
     """
-    def __init__(self, gamma, D, beta, **kwargs):
+    def __init__(self, gamma, D, beta, environment, **kwargs):
         """
         gamma: virtual mass coefficient
         D: drag coefficient
         beta: entrainment coefficient
         """
-        super(FullThermodynamicsCloudEquations, self).__init__(**kwargs)
+        super(FullThermodynamicsCloudEquations, self).__init__(environment=environment, **kwargs)
 
         self.gamma = gamma
         self.D = D
@@ -331,7 +331,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         return p/(T_c*R_s)
 
 
-    def dw_dz(self, z, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c):
+    def dw_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, rho_e):
         """
         Momentum equation
 
@@ -342,11 +342,9 @@ class FullThermodynamicsCloudEquations(CloudModel):
         """
         rho_c = self._cloud_mixture_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
 
-        rho0 = self.environment.rho(z)
-
         g = self.constants.g
 
-        B = (rho0 - rho_c)/rho_c
+        B = (rho_e - rho_c)/rho_c
 
         mu = self.beta/r_c
 
@@ -365,7 +363,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         F[Var.T] = self.environment.temp(z)
         return F
 
-    def dT_dz(self, z, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz):
+    def dT_dz(self, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, T_e):
         """
         Constants:
             cp_d: heat capacity of dry air at constant pressure
@@ -397,9 +395,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         qd_e, qv_e, ql_e, qi_e = 1.0, 0.0, 0.0, 0.0
 
         c_em_p = cp_d*qd_e + cp_v*(qv_e + ql_e + qi_e)
-        c_cm_p = cp_d*qd_c + cp_v*(qv_c + ql_c + qi_c)
 
-        T_e = self.environment.temp(z)
         # difference in environment and cloud moist static energy
         # XXX: There appears to be something wrong with the formulation that
         # includes liquid and ice, use just the liquid formulation for now
@@ -489,12 +485,14 @@ class FullThermodynamicsCloudEquations(CloudModel):
         
 
         # 1. Estimate change in vertical velocity with initial state
-        dwdz_ = self.dw_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i)
+        rho_e = self.environment.rho(z)
+        dwdz_ = self.dw_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, rho_e=rho_e)
 
         dFdz_[Var.w] = dwdz_
 
         # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
-        dTdz_s = self.dT_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0)
+        T_e = self.environment.temp(z)
+        dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0, T_e=T_e)
 
         F_s = np.copy(F)
         F_s[Var.T] += dTdz_s

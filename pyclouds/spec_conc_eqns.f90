@@ -3,19 +3,19 @@ module spec_conc_eqns
 
    integer, parameter :: dp = selected_real_kind(12)
 
-   real(dp), parameter :: R_d = 287.05
-   real(dp), parameter :: R_v = 461.51
-   real(dp), parameter :: g = 9.80665
-   real(dp), parameter :: rho_i = 1000.
-   real(dp), parameter :: rho_l = 500.
-   real(dp), parameter :: cp_d = 1005.46
-   real(dp), parameter :: cp_v = 1859.0
-   real(dp), parameter :: L_v = 2.5008e6
-   real(dp), parameter :: L_s = 2.8345e6
+   real(dp), parameter :: R_d = 287.05_dp
+   real(dp), parameter :: R_v = 461.51_dp
+   real(dp), parameter :: g = 9.80665_dp
+   real(dp), parameter :: rho_i = 1000._dp
+   real(dp), parameter :: rho_l = 500._dp
+   real(dp), parameter :: cp_d = 1005.46_dp
+   real(dp), parameter :: cp_v = 1859.0_dp
+   real(dp), parameter :: L_v = 2.5008e6_dp
+   real(dp), parameter :: L_s = 2.8345e6_dp
 
-   real(dp), parameter :: beta = 0.2
-   real(dp), parameter :: m__gamma = 1.0
-   real(dp), parameter :: m__D = 1.0
+   real(dp), parameter :: m__beta = 0.2_dp
+   real(dp), parameter :: m__gamma = 1.0_dp
+   real(dp), parameter :: m__D = 1.0_dp
 
 
    ! Indexing into state-array
@@ -141,7 +141,7 @@ contains
 
       B = (rho_e - rho_c)/rho_c
 
-      mu = beta/r_c
+      mu = m__beta/r_c
 
       dw_dz = 1.0_dp/w_c * (g/(1.0_dp+m__gamma)*B - mu*w_c**2.0_dp - m__D*w_c**2.0_dp/r_c)
 
@@ -177,9 +177,9 @@ contains
       ! qd_e, qv_e, ql_e, qi_e = self.qd_e, self.qv_e, self.ql_e, self.qi_e
       ! TODO: Allow definition of moist environment
       qd_e = 1.0_dp
-      qv_e = 1.0_dp
-      ql_e = 1.0_dp
-      qi_e = 1.0_dp
+      qv_e = 0.0_dp
+      ql_e = 0.0_dp
+      qi_e = 0.0_dp
 
       c_em_p = cp_d*qd_e + cp_v*(qv_e + ql_e + qi_e)
 
@@ -192,7 +192,7 @@ contains
       Ds = (c_em_p*T_e + ql_e*L_v) &
           -(c_cm_p*T_c + ql_c*L_v)
 
-      mu = beta/r_c
+      mu = m__beta/r_c
 
       dT_dz = -g/c_cm_p + mu*Ds/c_cm_p + L_v/c_cm_p*dql_c__dz + L_s/c_cm_p*dqi_c__dz
    end function
@@ -240,7 +240,7 @@ contains
       ! in-cloud specific constant of gas constituents
       qg_c = qd_c + qv_c
 
-      mu = beta/r_c
+      mu = m__beta/r_c
 
       dr_dz = r_c/2.0_dp*( &
          qg_c*rho_c/rho_cg * rho_c/rho_cg * g/(Rs_c*T_c) &
