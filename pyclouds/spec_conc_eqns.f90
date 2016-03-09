@@ -1,7 +1,9 @@
 module spec_conc_eqns
+   use cloudmodel_common, only: i_r, i_w, i_T, i_p, i_qv, i_ql, i_qr, i_qi
+   use cloudmodel_common, only: dp, nvars
+
    implicit none
 
-   integer, parameter :: dp = selected_real_kind(12)
 
    real(dp), parameter :: R_d = 287.05_dp
    real(dp), parameter :: R_v = 461.51_dp
@@ -18,22 +20,11 @@ module spec_conc_eqns
    real(dp), parameter :: m__D = 1.0_dp
 
 
-   ! Indexing into state-array
-   integer, parameter :: i_z  = 1
-   integer, parameter :: i_r  = 2
-   integer, parameter :: i_w  = 3
-   integer, parameter :: i_T  = 4
-   integer, parameter :: i_p  = 5
-   integer, parameter :: i_qd = 6
-   integer, parameter :: i_qv = 7
-   integer, parameter :: i_ql = 8
-   integer, parameter :: i_qr = 9
-   integer, parameter :: i_qi = 10
 
 contains
    !> Compute vertical derivate of full state-vector describing the cloud-parcel state `F` 
    !> given the environmental conditions
-   function dFdz(F, T_e, p_e, rho_e)
+   function dFdz(F, F_e)
       use microphysics_register, only: i_T_mphys => idx_temp
       use microphysics_register, only: i_p_mphys => idx_pressure
       use microphysics_register, only: i_qv_mphys => idx_water_vapour
@@ -44,17 +35,13 @@ contains
       ! TODO: get this from some pointer instead
       use isobaric_integration_helpers, only: dydt_mphys => dydt_isobaric
 
-      ! TODO: remove this when I've found out how to get f2py to use module variables
-      integer, parameter :: dp = selected_real_kind(12)
 
-      integer, parameter :: nvars = 10
-
-      real(dp), dimension(nvars), intent(in) :: F
-      real(dp), intent(in) :: p_e, rho_e, T_e
+      real(dp), dimension(nvars), intent(in) :: F, F_e
+      real(dp) :: p_e, rho_e, T_e
 
       real(dp), dimension(nvars) :: dFdz
 
-      real(dp) :: z, r, w, T, p
+      real(dp) :: r, w, T, p
       real(dp) :: q_v, q_l, q_i, q_r, q_d
 
       ! for holding the two contributions to temperature changes:
@@ -67,7 +54,14 @@ contains
 
       real(dp) :: cm_m_p
 
-      z = F(i_z)
+      ! TODO: For now the moisture in the enviroment is not considered when
+      ! calculating the changes wrt entrainment
+      !qv_e = F_e(i_qv)
+      T_e = F_e(i_T)
+      p_e = F_e(i_p)
+      rho_e = mod__mixture_density_from_eos(p=p_e, T=T_e, qd=1.0_dp, qv=0.0_dp, ql=0.0_dp, qi=0.0_dp)
+
+
       r = F(i_r)
       w = F(i_w)
       T = F(i_T)
@@ -119,15 +113,12 @@ contains
 
 
    !> Compute the mixture density from the full equation of state
-   pure function mod__cloud_mixture_density_from_eos(p, T_c, qd_c, qv_c, ql_c, qi_c) result(rho)
-      ! TODO: remove this when I've found out how to get f2py to use module variables
-      integer, parameter :: dp = selected_real_kind(12)
-
-      real(dp), intent(in) :: p, T_c, qd_c, qv_c, ql_c, qi_c
+   pure function mod__mixture_density_from_eos(p, T, qd, qv, ql, qi) result(rho)
+      real(dp), intent(in) :: p, T, qd, qv, ql, qi
       real(dp) :: rho
       real(dp) :: rho_inv
 
-      rho_inv = (qd_c*R_d + qv_c*R_v)*T_c/p + ql_c/rho_l + qi_c/rho_i
+      rho_inv = (qd*R_d + qv*R_v)*T/p + ql/rho_l + qi/rho_i
 
       rho = 1.0_dp/rho_inv
    end function
@@ -136,9 +127,6 @@ contains
    !> full equation of state, but rearranged to have the form of a
    !> traditional ideal gas equation of state.
    pure function mod__cloud_gas_density_from_eos(p, T_c, qd_c, qv_c) result(rho_g)
-      ! TODO: remove this when I've found out how to get f2py to use module variables
-      integer, parameter :: dp = selected_real_kind(12)
-
       real(dp), intent(in) :: p, T_c, qd_c, qv_c
       real(dp) :: rho_g
 
@@ -166,7 +154,7 @@ contains
       real(dp) :: dw_dz
       real(dp) :: rho_c, B, mu
 
-      rho_c = mod__cloud_mixture_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+      rho_c = mod__mixture_density_from_eos(p=p, T=T_c, qd=qd_c, qv=qv_c, ql=ql_c, qi=qi_c)
 
       B = (rho_e - rho_c)/rho_c
 
@@ -188,9 +176,6 @@ contains
    !>          qd_c, qv_c, ql_c, qi_c: environment (constant) dry air, water vapour, liquid water, ice
    !>          T_e: environment absolute temp
    pure function dT_dz(r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, T_e)
-      ! TODO: remove this when I've found out how to get f2py to use module variables
-      integer, parameter :: dp = selected_real_kind(12)
-
       real(dp), intent(in) :: r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, T_e
 
       real(dp) :: c_em_p, c_cm_p
@@ -229,9 +214,6 @@ contains
 
    !> Mass conservation equation
    pure function dr_dz (p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c,  dql_c__dz, dqi_c__dz, dTc_dz, dw_dz)
-      ! TODO: remove this when I've found out how to get f2py to use module variables
-      integer, parameter :: dp = selected_real_kind(12)
-
       real(dp), intent(in) :: p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c,  dql_c__dz, dqi_c__dz, dTc_dz, dw_dz
       real(dp) :: dr_dz
 
@@ -258,7 +240,7 @@ contains
       dqv_c__dz = - dql_c__dz - dqi_c__dz
 
       ! in-cloud mixture density
-      rho_c = mod__cloud_mixture_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+      rho_c = mod__mixture_density_from_eos(p=p, T=T_c, qd=qd_c, qv=qv_c, ql=ql_c, qi=qi_c)
 
       ! in-cloud gas density
       rho_cg = mod__cloud_gas_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c)
