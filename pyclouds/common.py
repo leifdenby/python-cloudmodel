@@ -64,6 +64,10 @@ def make_related_constants(constants):
     if 'cp_d' in constants and 'cp_v' in constants and not 'R_d' in constants:
         constants['R_d'] = constants['cp_d'] - constants['cv_d']
         constants['R_v'] = constants['cp_v'] - constants['cv_v']
+    if 'cp_i' in constants and not 'cv_i' in constants:
+        constants['cv_i'] = constants['cp_i']
+    if 'cp_l' in constants and not 'cv_l' in constants:
+        constants['cv_l'] = constants['cp_l']
     return constants
 
 um_constants = {
