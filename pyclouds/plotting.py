@@ -211,16 +211,19 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
     return fig
 
 
-def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right', initial_condition=None):
+def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right', initial_condition=None, fig=None, ny=1, global_legend=False):
     n = len(variables)
 
-    gs = gridspec.GridSpec(n, 1)
+    shape = int(math.ceil(float(n)/ny)), ny
+    gs = gridspec.GridSpec(*shape)
 
-    fig = plot.figure(figsize=(12,6*n))
+    if fig is None:
+        fig = plot.figure(figsize=(12,6*n))
 
-    lines = []
     colors = {}
     for n, (v, s) in enumerate(zip(variables, list(gs))):
+        lines = []
+
         t_max = 0.
         data_max = 0.
         data_min = 1.0e16
@@ -292,15 +295,19 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
         plot.xlabel('time [s]')
         plot.grid(True)
 
-        leg = plot.legend(loc=legend_loc)
-        try:
-            leg.get_frame().set_alpha(0.8)
-        except AttributeError:
-            pass
+        if not global_legend:
+            leg = plot.legend(loc=legend_loc)
+            try:
+                leg.get_frame().set_alpha(0.8)
+            except AttributeError:
+                pass
 
     title = "Hydrometeor evolution"
     if initial_condition is not None:
         title += '\n' + Var.repr(initial_condition, skip=['r', 'w', 'z', ])
+
+    if global_legend:
+        plot.figlegend(lines, [l.get_label() for l in lines], loc = 'lower center', ncol=ny, labelspacing=0. )
 
     plot.suptitle(title)
     fig.subplots_adjust(top=0.95)

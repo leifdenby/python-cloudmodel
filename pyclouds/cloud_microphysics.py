@@ -193,6 +193,36 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         self.debug = True
         self.disable_rain = kwargs.get('disable_rain', False)
 
+    def integrate(self, *args, **kwargs):
+        evolution = super(FiniteCondensationTimeMicrophysics, self).integrate(*args, **kwargs)
+
+        if self.model_constraint == 'isometric':
+            # XXX: This is a hack, we'd ideally predict the change in pressure,
+            # but instead we define a pressure that is consistent with fixed
+            # density of isometric evolution
+            # TODO: derive an equation to predict dp/dt
+
+            rho_l = self.constants.rho_l
+            rho_i = self.constants.rho_i
+            R_d = self.constants.R_d
+            R_v = self.constants.R_v
+
+            F = evolution.F
+            p_old = F[:, Var.p]
+            qv = F[:,Var.q_v]
+            ql = F[:,Var.q_l]
+            qr = F[:,Var.q_r]
+            qi = F[:,Var.q_i]
+            qd = 1. - qv - ql - qr - qi
+            T = F[:,Var.T]
+            rho = self.extra_vars['rho']
+
+            p = T*(qd*R_d + qv*R_v)/(1./rho - (ql+qr)/rho_l - qi/rho_i)
+
+            evolution.F[:,Var.p] = p
+
+        return evolution
+
     def calc_mixture_density(self, qd, qv, ql, qi, qr, p, T):
         warnings.warn("EoS calculation stored within microphysics, should really use something defined externally")
 
@@ -262,7 +292,24 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         p = F[Var.p]
 
         # mixture density
-        rho = self.calc_mixture_density(qd=qd, qv=qv, ql=ql, qi=qi, qr=qr, p=p, T=T)
+        if self.model_constraint == 'isometric' and 'rho' in self.extra_vars:
+            # XXX: as a quick fix we need to update the pressure here if we've
+            # already integrated one timestep. This issue is that we'd ideally
+            # prediect dp/dt but I don't have an equation for that right now,
+            # so we instead use the density from the last timestep to set a
+            # consistent pressure
+            rho_l = self.constants.rho_l
+            rho_i = self.constants.rho_i
+            R_d = self.constants.R_d
+            R_v = self.constants.R_v
+
+            rho = self.extra_vars['rho']
+            p = T*(qd*R_d + qv*R_v)/(1./rho - (ql+qr)/rho_l - qi/rho_i)
+        else:
+            rho = self.calc_mixture_density(qd=qd, qv=qv, ql=ql, qi=qi, qr=qr, p=p, T=T)
+            if hasattr(self, 'extra_vars'):
+                self.extra_vars['rho'] = rho
+
         # gas density
         rho_g = self.calc_mixture_density(qd=qd, qv=qv, ql=0., qi=0., qr=0., p=p, T=T)
 
