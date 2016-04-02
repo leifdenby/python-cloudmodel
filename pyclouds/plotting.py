@@ -211,7 +211,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
     return fig
 
 
-def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right', initial_condition=None, fig=None, ny=1, global_legend=False):
+def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right', initial_condition=None, fig=None, ny=1, global_legend=False, labels=None):
     n = len(variables)
 
     shape = int(math.ceil(float(n)/ny)), ny
@@ -307,7 +307,9 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
         title += '\n' + Var.repr(initial_condition, skip=['r', 'w', 'z', ])
 
     if global_legend:
-        plot.figlegend(lines, [l.get_label() for l in lines], loc = 'lower center', ncol=ny, labelspacing=0. )
+        if labels is None:
+            labels = [l.get_label() for l in lines]
+        plot.figlegend(lines, labels, loc = 'lower center', ncol=ny, labelspacing=0. )
 
     plot.suptitle(title)
     fig.subplots_adjust(top=0.95)
