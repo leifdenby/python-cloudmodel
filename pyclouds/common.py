@@ -41,6 +41,26 @@ CCFM_constants = {
     }
 }
 
+ECHAM6_3_constants = {
+    "R_d": 287.04,  # 'Rd'
+    "R_v": 461.51,  # 'Rv'
+    "L_v": 2.5008e6,  # 'aLv'
+    "L_s": 2.8345e6,  # 'aLs'
+    "cp_d": 1004.64,  # 'Cpd'
+    "cp_v": 1869.46,  # not specified in CCFM?
+    "cp_i": 2106.,  # Not used in CCFM?
+    "rho_l": 1000.,  # 'Rho_w'
+    "rho_i": 917.,  # 'Rho_i'
+    "g": 9.80665,  # 'g'
+    "pv_sat": {
+        'p0vs': 610.78,
+        'a0_lq': 17.269,
+        'a1_lq': -35.86,
+        'a0_ice': 21.875,
+        'a1_ice': -7.66,
+    }
+}
+
 ATHAM_constants = {
     "cp_d": 1004.64,
     "cv_d": 717.60,
