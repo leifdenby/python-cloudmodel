@@ -47,6 +47,7 @@ class CloudModel(object):
             return True
         elif F_top[Var.w] < 0.0:
             print "Integration stopped: vertical velocity dropped to zero"
+            print F_top[Var.w]
             return True
         elif F_top[Var.r] > 100e3:
             print "Integration stopped: cloud radius became unreasonably high (r>100km)"
@@ -549,16 +550,18 @@ class FullThermodynamicsCloudEquations(CloudModel):
         # cloud is assumed to be at same pressure as in environment
         p = self.environment.p(z)
 
+        rho_e = self.environment.rho(z)
+        T_e = self.environment.temp(z)
+
         dFdz_ = np.zeros((Var.NUM,))
-        
 
         # 1. Estimate change in vertical velocity with initial state
-        dwdz_ = self.dw_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i)
+        dwdz_ = self.dw_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, rho_e=rho_e)
 
         dFdz_[Var.w] = dwdz_
 
         # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
-        dTdz_s = self.dT_dz(z=z, p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0)
+        dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0, T_e=T_e)
 
         dFdz_[Var.T] += dTdz_s
 
