@@ -166,7 +166,9 @@ contains
 
       real(dp), dimension(nvars) :: F0 ! Initial condition, will be set for each cloud type
       integer :: i
-      real(dp) :: z = 0.0
+      real(dp),      dimension(level) :: z
+
+      z(:) = geog/g
 
 
       ! Init ambient
@@ -199,13 +201,24 @@ contains
 
       enddo
 
+      ! Assign back to CCFM's old struct-based data format
 
-      ! Integrate
    end subroutine
 
-   subroutine integrate_profile(F0, cloud_number)
+   subroutine integrate_profile(F0, z_levels, F_out, n_levels)
+      integer, intent(in) :: n_levels
       real(dp), intent(in), dimension(nvars) :: F0
-      integer, intent(in) :: cloud_number
+      real(dp), intent(in), dimension(n_levels) :: z_levels  ! height levels in output [m]
+      real(dp), intent(out), dimension(n_levels, nvars) :: F_out
+
+      integer :: k
+
+      F_out(1,:) = F0
+      ! call integrate method to integrate state to every height in `z_levels`
+      do k = 2, n_levels
+         call microphysics_integrate(dFdz, F0)
+         F_out(k,:) = F0
+      enddo
    end subroutine
 
    function dFdz(z, F)

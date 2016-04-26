@@ -81,7 +81,7 @@ contains
       dFdz(i_w) = dw_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, rho_e=rho_e)
 
       ! 2. Estimate changes from microphysics
-      ! (need to create state vector to supply to migrophysics)
+      ! (need to create state vector to supply to microphysics)
       y = 0.0
       y(i_p_mphys) = p
       y(i_T_mphys) = T
