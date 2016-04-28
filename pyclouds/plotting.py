@@ -131,8 +131,17 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 tephigram.plot_temp(**kwargs)
 
                 def ref_plot_func():
-                    Te = profile.cloud_model.environment.temp(z)
-                    kwargs = { 'P': p/100., 'T': Te-273.15, 'marker': '.', 'color': 'black', 'label': 'environment'}
+                    z_ = np.linspace(0, 10e3, 100)
+                    Te = profile.cloud_model.environment.temp(z_)
+                    RH_e = profile.cloud_model.environment.rel_humidity(z_)
+                    p_e = profile.cloud_model.environment.p(z_)
+                    kwargs = { 'P': p_e/100., 'T': Te-273.15, 'RH': RH_e }
+                    RH_line, = tephigram.plot_RH(**kwargs)
+                    RH_line.set_marker('')
+                    RH_line.set_linestyle('-')
+
+                    kwargs = { 'P': p_e/100., 'T': Te-273.15, 'marker': '', 'color': 'black', 'label': 'environment',
+                            'with_height_markers': z_, 'marker_interval': 500, }
                     return tephigram.plot_temp(**kwargs)
                 plot.title("Tephigram")
 
