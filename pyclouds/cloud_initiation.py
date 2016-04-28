@@ -7,6 +7,9 @@ from common import default_constants, Var
 from cloud_microphysics import MoistAdjustmentMicrophysics
 import parameterisations
 
+class CloudbaseNotFoundException(Exception):
+    pass
+
 def compute_LCL(environment, F0):
     """
     Compute the height at which an adiabatically lifted sub-saturated parcel
@@ -40,9 +43,9 @@ def compute_LCL(environment, F0):
         Sw = qv/qv_sat
 
         if Sw > 1.0:
-            break
+            return z, T
         if z > 10e3:
-            raise Exception()
+            raise CloudbaseNotFoundException
 
         # temperature decreases at at dry adiabatic lapse rate
         dTdz = -g/cp_g
@@ -50,4 +53,87 @@ def compute_LCL(environment, F0):
         z += dz
         T += dz*dTdz
 
-    return z, T
+    raise CloudbaseNotFoundException
+
+
+def original_CCFM_cloudbase(environment):
+    """
+    Based of `cloudbase` in `mo_ccfm_cloudbase.f90`
+    https://github.com/leifdenby/ccfm/blob/master/src/mo_ccfm_cloudbase.f90
+
+      cl_base = 1
+      cond    = .false.
+
+      T_c = T_e(level)
+      q_c = q_e(level)
+
+      base: do l = level-1, 2 ,-1
+            
+         ! dry adiabatic ascent
+         T_c =  ( cpd * T_c + geo(l+1) - geo(l) ) / cpd
+         q_old = q_c
+
+         ! adjustmend for moist ascent
+         call moist_adjust( T_c, q_c, prs(l) )
+     
+         ! if condensation occurred
+         if ( q_c < q_old ) cond = .true.
+
+         buo =   T_c    * ( 1._dp + epsi * q_c )     &
+               - T_e(l) * ( 1._dp + epsi * q_e(l) )
+        
+         if ( cond .and. (buo >= - basebuo) ) then
+             cl_base = l
+             exit
+         end if
+            
+         if ( cond .and. (buo <= -(basebuo + 0.2_dp)) ) then
+            exit
+         endif
+
+      end do base
+    """
+    mphys = MoistAdjustmentMicrophysics()
+
+    basebuo = 0.5  # taken from `cloudbase.f90`
+
+    cp_d = default_constants.get('cp_d')
+    R_d = default_constants.get('R_d')
+    R_v = default_constants.get('R_v')
+    g = default_constants.get('g')
+
+    epsi = R_d/R_v
+
+    condensed = False
+
+    dz = 10.
+    z = 0.
+    T_c = environment.temp(z)
+    qv_c = environment.q_v(z)
+
+    # we don't expect a cloud-base above 4km
+    while z < 4e3:
+        z += dz
+        T_c += -g/cp_d*dz
+        p_c = environment.p(z)
+
+        T_e = environment.temp(z)
+        qv_e = environment.q_v(z)
+
+        F = Var.make_state(T=T_c, p=p_c, q_v=qv_c)
+        F_new = mphys._calc_adjusted_state(F, iterations=5)
+
+        if (F_new[Var.q_v] < F[Var.q_v]):
+            condensed = True
+            T_c = F_new[Var.T]
+
+        buo = T_c*(1. + epsi*qv_c) - T_e*(1. + epsi*qv_e)
+
+        if (condensed and buo >= -basebuo):
+            return z, T_c, qv_c
+
+        if (condensed and buo <= -(basebuo + 0.2)):
+            break
+
+    raise CloudbaseNotFoundException
+
