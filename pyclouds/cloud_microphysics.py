@@ -111,8 +111,8 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
 
         return HydrometeorEvolution(F=F, t=t, model=self, integration_kwargs={ 'iterations': iterations, })
 
-    def __call__(self, *args, **kwargs):
-        raise Exception("Since moist adjustment is instaneous it cannot be called to provided a differential")
+    def dFdt(self, *args, **kwargs):
+        raise Exception("Since moist adjustment is instaneous it cannot be called to provide a differential")
 
     def qv_sat(self, T, p):
         return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
@@ -324,10 +324,10 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         if self.disable_rain:
             dqr_dt = 0.0
 
-        dFdz = np.zeros((Var.NUM))
-        dFdz[Var.q_l] =  dql_dt -dqr_dt
-        dFdz[Var.q_v] = -dql_dt
-        dFdz[Var.q_r] =          dqr_dt
+        dFdt = np.zeros((Var.NUM))
+        dFdt[Var.q_l] =  dql_dt -dqr_dt
+        dFdt[Var.q_v] = -dql_dt
+        dFdt[Var.q_r] =          dqr_dt
 
         if self.model_constraint == 'isometric':
             c_m = self.cv_m(F=F)
@@ -336,12 +336,12 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         else:
             raise NotImplementedError("Model constraint mode '%s' not implemented" % self.model_constraint)
 
-        dFdz[Var.T] = Lv/c_m*dql_dt
+        dFdt[Var.T] = Lv/c_m*dql_dt
 
         if self.debug and hasattr(self, 'extra_vars'):
             self.extra_vars.setdefault('t_substeps', []).append(t)
 
-        return dFdz
+        return dFdt
 
     def _dqr_dt__autoconversion(self, ql, qg, rho_g):
         """
@@ -406,7 +406,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         Fd = R_v*T/(pv_sat*Dv)
 
         # compute rate of change of condensate from diffusion
-        dql_dt = 4*pi*1./rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
+        dql_dt = 4*pi*rho_l/rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
 
         if self.debug and hasattr(self, 'extra_vars'):
             self.extra_vars.setdefault('r_c', []).append(r_c)
