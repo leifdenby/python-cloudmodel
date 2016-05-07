@@ -634,7 +634,7 @@ class FullEquationsSatMicrophysics(FullThermodynamicsCloudEquations):
 
 
         # 3. With new temperature estimate new state from phase changes predicted by microphysics
-        F_s = self.microphysics._calc_adjusted_state(F_s, p=p, iterations=2)
+        F_s = self.microphysics._calc_adjusted_state(F_s, iterations=2)
 
         dTdz_ = F_s[Var.T] - F[Var.T]
         dFdz_[Var.T] = dTdz_
@@ -651,3 +651,154 @@ class FullEquationsSatMicrophysics(FullThermodynamicsCloudEquations):
         dFdz_[Var.r] = drdz_
 
         return dFdz_
+
+
+
+
+class FixedRiseRateParcel(CloudModel):
+    """
+    Simple model to test the lapse rate of a parcel that as is forced to rise
+    with a constant velocity
+    """
+    def __init__(self, w0, beta, **kwargs):
+        """
+        gamma: virtual mass coefficient
+        D: drag coefficient
+        beta: entrainment coefficient
+        """
+        super(self.__class__, self).__init__(**kwargs)
+
+        self.w0 = w0
+        self.beta = beta
+
+    def _stopping_criterion(self, F_solution, z, k):
+        F_top = F_solution[k]
+        z_top = z[k]
+
+        if z_top > 5000.0:
+            print "Integration stopped: max altitude reached"
+            return True
+        else:
+            return False
+
+    def _cloud_mixture_density_from_eos(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
+        """
+        Compute the mixture density from the import full equation of state
+
+        Constants:
+            R_d: specific gas constant of dry air
+            R_v: specific gas constant of water vapour
+            rho_l: density of liquid water
+            rho_i: density of ice
+        """
+        R_d = self.constants.R_d
+        R_v = self.constants.R_v
+        rho_l = self.constants.rho_l
+        rho_i = self.constants.rho_i
+
+        rho_inv = (qd_c*R_d + qv_c*R_v)*T_c/p + ql_c/rho_l + qi_c/rho_i
+        
+        return 1.0/rho_inv
+
+    def _cloud_gas_density_from_eos(self, p, T_c, qd_c, qv_c):
+        """
+        Compute the gas density from equation of state. This is the same as the
+        full equation of state, but rearranged to have the form of a
+        traditional ideal gas equation of state.
+
+        Constants:
+            R_d: specific gas constant of dry air
+            R_v: specific gas constant of water vapour
+            R_s: effective specific gas constant of gas mixture
+        """
+        R_d = self.constants.R_d
+        R_v = self.constants.R_v
+
+        R_s = (R_v*qv_c + R_d*qd_c)/(qd_c + qv_c)
+
+        return p/(T_c*R_s)
+
+
+    def dT_dz(self, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, T_e):
+        """
+        Constants:
+            cp_d: heat capacity of dry air at constant pressure
+            cp_v: heat capacity of liquid water at constant pressure
+            L_v: latent heat of vapourisation (vapour -> liquid)
+            L_s: latent heat sublimation (vapour -> solid)
+            
+        State variables:
+            qd_c, qv_c, ql_c, qi_c: in-cloud dry air, water vapour, liquid water, ice
+            T_c: in-cloud absolute temp
+
+            dql_c__dz, qdi_c__dz: vertical in
+
+            qd_c, qv_c, ql_c, qi_c: environment (constant) dry air, water vapour, liquid water, ice
+            T_e: environment absolute temp
+        """
+        cp_d = self.constants.cp_d
+        cp_v = self.constants.cp_v
+        L_v = self.constants.L_v
+        L_s = self.constants.L_s
+        g = self.constants.g
+
+        # heat capacity of cloud mixture
+        c_cm_p = cp_d*qd_c + cp_v*(qv_c + ql_c + qi_c)
+
+        # heat capacity of environment mixture
+        # qd_e, qv_e, ql_e, qi_e = self.qd_e, self.qv_e, self.ql_e, self.qi_e
+        # TODO: Allow definition of moist environment
+        qd_e, qv_e, ql_e, qi_e = 1.0, 0.0, 0.0, 0.0
+
+        c_em_p = cp_d*qd_e + cp_v*(qv_e + ql_e + qi_e)
+
+        # difference in environment and cloud moist static energy
+        # XXX: There appears to be something wrong with the formulation that
+        # includes liquid and ice, use just the liquid formulation for now
+        # Ds = (c_em_p*T_e - ql_e*L_v - qi_e*L_s)\
+            # -(c_cm_p*T_c - ql_c*L_v - qi_c*L_s)
+        Ds = (c_em_p*T_e + ql_e*L_v)\
+            -(c_cm_p*T_c + ql_c*L_v)
+
+        mu = self.beta/r_c
+
+
+        return  -g/c_cm_p + mu*Ds/c_cm_p + L_v/c_cm_p*dql_c__dz + L_s/c_cm_p*dqi_c__dz
+
+
+    def dFdz(self, F, z):
+        r = F[Var.r]
+        w = F[Var.w]
+        T = F[Var.T]
+        q_v = F[Var.q_v]
+        q_l = F[Var.q_l]
+        q_i = F[Var.q_i]
+        q_r = F[Var.q_r]
+        q_d = 1.0 - q_v - q_l - q_i - q_r
+
+        # cloud is assumed to be at same pressure as in environment
+        p = self.environment.p(z)
+
+        rho_e = self.environment.rho(z)
+        T_e = self.environment.temp(z)
+
+        dFdz_ = np.zeros((Var.NUM,))
+
+        dFdz_[Var.w] = 0.0
+
+        # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
+        dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0, T_e=T_e)
+
+        dFdz_[Var.T] = dTdz_s
+
+        # 3. estimate new state from phase changes predicted by microphysics
+        dFdt_micro = self.microphysics.dFdt(F, t=None)
+        dFdz_micro = dFdt_micro/w  # w = dz/dt
+        dFdz_ += dFdz_micro
+
+        dFdz_[Var.r] = 0.0
+
+        return dFdz_
+
+    def __str__(self):
+        return r"Fixed vertical velocity: w0={w0}m/s, mu-phys: {mphys}".format(w0=self.w0, mphys=self.microphysics)
