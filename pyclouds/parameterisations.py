@@ -102,6 +102,29 @@ class SaturationVapourPressure(BaseParameterisation):
 
         return constants_label
 
+class SaturatedAdiabaticLapseRate(BaseParameterisation):
+    """
+    Compute saturated moist lapse rate, equation taken directly from wikipedia
+
+    https://en.wikipedia.org/wiki/Lapse_rate#Moist_adiabatic_lapse_rate
+    """
+    default_constants = common.default_constants
+
+    def __call__(self, p, T):
+        pv_sat_ = pv_sat.pv_sat(T=T)
+        g = self.constants.get('g')
+        L_v = self.constants.get('L_v')
+        R_v = self.constants.get('R_v')
+        R_d = self.constants.get('R_d')
+        eps = R_d/R_v
+        cp_d = self.constants.get('cp_d')
+        
+        r = eps*pv_sat_/(p - pv_sat_)
+
+        dTdz_moist = g*(1. + L_v*r/(R_d*T))/(cp_d + L_v**2.*r*eps/(R_d*T**2.))
+
+        return dTdz_moist
+
 
 class ThermalConductivityCoefficient(BaseParameterisation):
     default_constants = {
@@ -178,7 +201,9 @@ class ParametersationsWithSpecificConstants:
         self.pv_sat = self.__wrap(SaturationVapourPressure, constants, 'pv_sat')
         self.Ka = self.__wrap(ThermalConductivityCoefficient, constants, 'Ka')
         self.Dv = WaterVapourDiffusionCoefficient()
+        self.dTdz_moist = SaturatedAdiabaticLapseRate(constants)
 
 pv_sat = SaturationVapourPressure()
 Ka = ThermalConductivityCoefficient()
 Dv = WaterVapourDiffusionCoefficient()
+dTdz = SaturatedAdiabaticLapseRate()
