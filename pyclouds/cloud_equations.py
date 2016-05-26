@@ -11,10 +11,11 @@ import cloud_microphysics
 
 
 class CloudProfile():
-    def __init__(self, F, z, cloud_model):
+    def __init__(self, F, z, cloud_model, extra_vars={}):
         self.F = F
         self.z = z
         self.cloud_model = cloud_model
+        self.extra_vars = extra_vars
 
     def plot(self):
         return plotting.plot_profiles([self,], variables=['r', 'w', 'T',])
@@ -140,18 +141,33 @@ class CloudModel(object):
     def integrate(self, initial_condition, z, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3, fail_on_nan=False):
         self._validate_initial_state(initial_condition)
 
-        solver = SolverClass(self.dFdz, rtol=0.0, atol=tolerance,)
+        rtol = 0.001
+        atol_q = 1.0e-5
+        min_step = 0.1
+        atol = Var.make_state(p=100., T=0.1, q_v=atol_q, q_l=atol_q, w=0.1, r=10., q_r=atol_q, z=10., q_i=atol_q)
+
+        solver = SolverClass(self.dFdz, rtol=rtol, atol=atol, min_step=min_step)
         solver.set_initial_condition(initial_condition)
         self.fail_on_nan = fail_on_nan
+
+        mphys_extra_vars = {}
+        self.microphysics.extra_vars = mphys_extra_vars
 
         if stopping_criterion is None:
             stopping_criterion=self._stopping_criterion
         F, z = solver.solve(z, stopping_criterion,)
 
-        F = F[:-2]
-        z = z[:-2]
+        if self._stopping_criterion(F_solution=F, z=z, k=len(z)-1):
+            F = F[:-1]
+            z = z[:-1]
 
-        return CloudProfile(F=F, z=z, cloud_model=self)
+            for k, v in mphys_extra_vars.items():
+                try:
+                    mphys_extra_vars[k] = v[:-1]
+                except IndexError:
+                    pass
+
+        return CloudProfile(F=F, z=z, cloud_model=self, extra_vars=mphys_extra_vars)
 
 
 class NoMicrophysicsNoEntrainment:
@@ -428,7 +444,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         g = self.constants.g
 
-        B = (rho_e - rho_c)/rho_c
+        B = (rho_e - rho_c)/rho_e
 
         mu = self.beta/r_c
 
@@ -549,6 +565,13 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         # cloud is assumed to be at same pressure as in environment
         p = self.environment.p(z)
+        # NB: need to make sure that pressure is set since the microphysics
+        # needs it and we don't integrate a pressure gradient, instead we
+        # assume pressure balance with environment
+        F[Var.p] = p
+
+        # print "z=", z,
+        # Var.print_formatted(F)
 
         rho_e = self.environment.rho(z)
         T_e = self.environment.temp(z)
@@ -563,18 +586,20 @@ class FullThermodynamicsCloudEquations(CloudModel):
         # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
         dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0, T_e=T_e)
 
-        dFdz_[Var.T] += dTdz_s
+        dFdz_[Var.T] = dTdz_s
 
         # 3. estimate new state from phase changes predicted by microphysics
-        dFdt_micro = self.microphysics.dFdt(F, t=None)
+        F[Var.p] = p  # make sure that pressure is set since the microphysics needs it
+        dFdt_micro = self.microphysics.dFdt(F, t=z) # passing in `z` as `t` doesn't make sense physically, but it will just be used for plotting later
 
         dFdz_micro = dFdt_micro/w  # w = dz/dt
         dFdz_ += dFdz_micro
 
-
         dql_c__dz = dFdz_micro[Var.q_l]
         dqi_c__dz = dFdz_micro[Var.q_i]
         dTdz_ = dTdz_s + dFdz_micro[Var.T]
+
+        dFdz_[Var.T] = dTdz_
 
         # 4. Use post microphysics state (and phase changes from microphysics) to estimate radius change
         drdz_ = self.dr_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, 
@@ -582,12 +607,39 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         dFdz_[Var.r] = drdz_
 
+        # calculate adiabatic lapse rate from equation on wikipedia
+        # from pyclouds.common import default_constants
+
+        # pv_sat = self.microphysics.parameterisations.pv_sat(T=T)
+        # g = default_constants.get('g')
+        # L_v = default_constants.get('L_v')
+        # R_v = default_constants.get('R_v')
+        # R_d = default_constants.get('R_d')
+        # eps = R_d/R_v
+        # cp_d = default_constants.get('cp_d')
+        
+        # r = eps*pv_sat/(p - pv_sat)
+
+        # dTdz_moist = g*(1. + L_v*r/(R_d*T))/(cp_d + L_v**2.*r*eps/(R_d*T**2.))
+
+        # qv_sat = self.microphysics.parameterisations.pv_sat.qv_sat(T=T, p=p)
+        # print "2> qv={}, qv_sat={}, T={}, p={}".format(q_v, qv_sat, T, p)
+        # print z, dTdz_s, dFdz_micro[Var.T], dTdz_moist, 'Sw=', q_v/qv_sat
+        # print "ddz", 
+        # Var.print_formatted(dFdz_)
+        # print "dz_max=",
+        # Var.print_formatted(F/dFdz_)
+        # print ">> dF (dz=5m)=",
+        # Var.print_formatted(dFdz_*5.)
+        # Var.print_formatted(F + dFdz_*5.)
+        # print
+
+        # raw_input()
 
         return dFdz_
 
     def __str__(self):
         return r"FullSpecConcEqns ($D=%g$, $\beta=%g$), mu-phys: %s" % (self.D, self.beta, str(self.microphysics))
-
 
 class FullEquationsSatMicrophysics(FullThermodynamicsCloudEquations):
     """
@@ -651,9 +703,6 @@ class FullEquationsSatMicrophysics(FullThermodynamicsCloudEquations):
         dFdz_[Var.r] = drdz_
 
         return dFdz_
-
-
-
 
 class FixedRiseRateParcel(CloudModel):
     """
