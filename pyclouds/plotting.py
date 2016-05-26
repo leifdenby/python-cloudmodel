@@ -104,6 +104,8 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
         d_max = 0.0
 
         for n_profile, profile in enumerate(profiles):
+            z = profile.z
+
             if v == 'mse':
                 raise NotImplementedError
                 # TODO: Reimplement this, so that it uses mse calculation from model
@@ -116,6 +118,21 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                         # F_e[...,Var.T] = Te
                         # environment_mse = utils.Utils(profile.cloud_model.constants).moist_static_energy(F_e, profile.z)/1.e3
                         # return plot.plot(environment_mse, z, marker='', label='environment')
+            elif v == 'Sw':
+                profile_data = None
+            elif hasattr(profile, 'extra_vars') and v in profile.extra_vars:
+                profile_data = profile.extra_vars[v]
+                if len(profile_data) == len(profile.z):
+                    pass
+                else:
+                    try:
+                        z = profile.extra_vars['t_substeps']
+                    except KeyError:
+                        warnings.warn("Had to skip plotting `{}` because too many datapoints were found, probably using a sub-stepping integration method".format(v))
+                        continue
+
+                if v == 'r_c':
+                    profile_data = 1.0e6*np.array(profile_data)
             elif i == None:
                 raise NotImplementedError("Variable not found")
             else:
@@ -130,18 +147,23 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     kwargs['color'] = lines[n_profile].get_color()
                 tephigram.plot_temp(**kwargs)
 
-                def ref_plot_func():
-                    z_ = np.linspace(0, 10e3, 100)
-                    Te = profile.cloud_model.environment.temp(z_)
-                    RH_e = profile.cloud_model.environment.rel_humidity(z_)
-                    p_e = profile.cloud_model.environment.p(z_)
-                    kwargs = { 'P': p_e/100., 'T': Te-273.15, 'RH': RH_e }
-                    RH_line, = tephigram.plot_RH(**kwargs)
-                    RH_line.set_marker('')
-                    RH_line.set_linestyle('-')
+                RH = profile.F[:,Var.q_v]/parameterisations.pv_sat.qv_sat(T=T, p=p)
+                kwargs = { 'P': p/100., 'T': T-273.15, 'RH': RH }
+                RH_line, = tephigram.plot_RH(**kwargs)
+                RH_line.set_marker('')
+                RH_line.set_linestyle('-')
 
-                    kwargs = { 'P': p_e/100., 'T': Te-273.15, 'marker': '', 'color': 'black', 'label': 'environment',
-                            'with_height_markers': z_, 'marker_interval': 500, }
+                def ref_plot_func():
+                    T_e = profile.cloud_model.environment.temp(z)
+                    kwargs = { 'P': p/100., 'T': T_e-273.15, 'marker': '.'}
+                    tephigram.plot_temp(**kwargs)
+
+                    RH = profile.F[:,Var.q_v]/parameterisations.pv_sat.qv_sat(T=T, p=p)
+                    kwargs = { 'P': p/100., 'T': T-273.15, 'RH': RH }
+                    RH_line, = tephigram.plot_RH(**kwargs)
+
+                    kwargs = { 'P': p/100., 'T': T-273.15, 'marker': '', 'color': 'black', 'label': 'environment',
+                            'with_height_markers': z, 'marker_interval': 500, }
                     return tephigram.plot_temp(**kwargs)
                 plot.title("Tephigram")
 
@@ -151,13 +173,15 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 else:
                     label = str(profile)
 
-                profile_line = plot.plot(profile_data, profile.z, label=label, marker='.', linestyle='',)
+                if not profile_data is None:
+                    profile_line = plot.plot(profile_data, z, label=label, marker='.', linestyle='',)
+
+                    if n == 0:
+                        lines += profile_line
+
+                    d_max = max(max(profile_data), d_max)
+
                 plot.grid(True)
-
-                if n == 0:
-                    lines += profile_line
-
-                d_max = max(max(profile_data), d_max)
 
                 if v == 'T':
                     plot.xlabel('temperature [K]')
@@ -177,11 +201,27 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     scale_by_max = True
 
                     T = profile.F[:,Var.T]
+                    p = profile.F[:,Var.p]
                     z = profile.z
-                    p = profile.cloud_model.environment.p(z)
-                    q_v__sat = parameterisations.pv_sat.qv_sat(T=T, p=p)
+                    p_e = profile.cloud_model.environment.p(z)
+                    constants = profile.cloud_model.constants
+                    q_v__sat = parameterisations.ParametersationsWithSpecificConstants(constants=constants).pv_sat.qv_sat(T=T, p=p)
                     color = lines[n_profile].get_color()
                     plot.plot(q_v__sat, z, marker='', color=color, label='')
+                elif v == 'Sw':
+                    plot.ylabel('height [m]')
+                    plot.xlabel('super saturation [%]')
+
+                    T = profile.F[:,Var.T]
+                    p = profile.F[:,Var.p]
+                    z = profile.z
+                    constants = profile.cloud_model.constants
+                    q_v__sat = parameterisations.ParametersationsWithSpecificConstants(constants=constants).pv_sat.qv_sat(T=T, p=p)
+                    q_v = profile.F[:,Var.q_v]
+                    color = lines[n_profile].get_color()
+                    Sw = (q_v/q_v__sat - 1.)*100.
+                    plot.plot(Sw, z, marker='.', color=color, label='', linestyle='')
+                    plot.xlim(-5, 5)
                 elif v == 'q_l':
                     plot.ylabel('height [m]')
                     plot.xlabel('liquid water specific concentration [kg/kg]')
@@ -193,6 +233,12 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 elif v == 'mse':
                     plot.ylabel('height [m]')
                     plot.xlabel('Moist static energy [kJ]')
+                elif v == 'r_c':
+                    plot.ylabel(r'height [$m$]')
+                    plot.xlabel('cloud-droplet radius [$\mu m$]')
+                elif v == 'Nc':
+                    plot.ylabel('height [m]')
+                    plot.xlabel('cloud droplet number [1/m^3]')
                 else:
                     raise NotImplementedError
 
