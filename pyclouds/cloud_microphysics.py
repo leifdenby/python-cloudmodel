@@ -235,9 +235,6 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         
         return 1.0/rho_inv
 
-    def qv_sat(self, T, p):
-        return self.parameterisations.pv_sat.qv_sat(T=T, p=p)
-
     def cp_m(self, F):
         qv = F[Var.q_v]
         ql = F[Var.q_l]
@@ -381,7 +378,8 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         # condensation evaporation of cloud droplets (given number of droplets
         # and droplet radius calculated above)
-        Sw = qv/self.qv_sat(T=T, p=p)
+        qv_sat = self.parameterisations.pv_sat.qv_sat(T=T, p=p)
+        Sw = qv/qv_sat
 
         if ql == 0.0 and Sw > 1.0:
             r_c = self.r0
