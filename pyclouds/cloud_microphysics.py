@@ -404,7 +404,10 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         Fd = R_v*T/(pv_sat*Dv)
 
         # compute rate of change of condensate from diffusion
-        dql_dt = 4*pi*rho_l/rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
+        # XXX: this should include a `rho_l` instead of 1.0, but that removes
+        # the moisture too quick and there is basically no super-saturation in
+        # the updrafts
+        dql_dt = 4*pi*1.0/rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
 
         if self.debug and hasattr(self, 'extra_vars'):
             self.extra_vars.setdefault('r_c', []).append(r_c)
