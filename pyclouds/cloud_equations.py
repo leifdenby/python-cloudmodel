@@ -380,11 +380,13 @@ class FullThermodynamicsCloudEquations(CloudModel):
     ...
 
     """
-    def __init__(self, gamma, D, beta, environment, **kwargs):
+    def __init__(self, environment, gamma=0.5, D=0.506, beta=0.2, **kwargs):
         """
         gamma: virtual mass coefficient
         D: drag coefficient
         beta: entrainment coefficient
+
+        Default values from Simpson & Wiggert 1969
         """
         self.entrain_moist_static_energy = kwargs.pop('entrain_moist_static_energy', True)
         super(FullThermodynamicsCloudEquations, self).__init__(environment=environment, **kwargs)
