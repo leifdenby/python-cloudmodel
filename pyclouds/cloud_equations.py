@@ -386,6 +386,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         D: drag coefficient
         beta: entrainment coefficient
         """
+        self.entrain_moist_static_energy = kwargs.pop('entrain_moist_static_energy', True)
         super(FullThermodynamicsCloudEquations, self).__init__(environment=environment, **kwargs)
 
         self.gamma = gamma
@@ -393,7 +394,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         self.beta = beta
 
 
-    def _cloud_mixture_density_from_eos(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
+    def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
         """
         Compute the mixture density from the import full equation of state
 
@@ -440,7 +441,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
             r: cloud radius
             rho_c: cloud density
         """
-        rho_c = self._cloud_mixture_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+        rho_c = self.cloud_mixture_density(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
 
         g = self.constants.g
 
@@ -448,10 +449,9 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         mu = self.beta/r_c
 
-
         return 1.0/w_c * (g/(1.+self.gamma)*B - mu*w_c**2. - self.D*w_c**2./r_c)
 
-    def dT_dz(self, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, T_e):
+    def dT_dz(self, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, T_e, qv_e):
         """
         Constants:
             cp_d: heat capacity of dry air at constant pressure
@@ -474,26 +474,34 @@ class FullThermodynamicsCloudEquations(CloudModel):
         L_s = self.constants.L_s
         g = self.constants.g
 
-        # heat capacity of cloud mixture
-        c_cm_p = cp_d*qd_c + cp_v*(qv_c + ql_c + qi_c)
+        if self.entrain_moist_static_energy:
+            # heat capacity of cloud mixture
+            c_cm_p = cp_d*qd_c + cp_v*(qv_c + ql_c + qi_c)
 
-        # heat capacity of environment mixture
-        # qd_e, qv_e, ql_e, qi_e = self.qd_e, self.qv_e, self.ql_e, self.qi_e
-        # TODO: Allow definition of moist environment
-        qd_e, qv_e, ql_e, qi_e = 1.0, 0.0, 0.0, 0.0
+            qd_e = 1.0 - qv_e
+            ql_e, qi_e = 0.0, 0.0
 
-        c_em_p = cp_d*qd_e + cp_v*(qv_e + ql_e + qi_e)
+            c_em_p = cp_d*qd_e + cp_v*(qv_e + ql_e + qi_e)
 
-        # difference in environment and cloud moist static energy
-        # XXX: There appears to be something wrong with the formulation that
-        # includes liquid and ice, use just the liquid formulation for now
-        # Ds = (c_em_p*T_e - ql_e*L_v - qi_e*L_s)\
-            # -(c_cm_p*T_c - ql_c*L_v - qi_c*L_s)
-        Ds = (c_em_p*T_e + ql_e*L_v)\
-            -(c_cm_p*T_c + ql_c*L_v)
+            # difference in environment and cloud moist static energy
+            Ds = (c_em_p*T_e + ql_e*L_v)\
+                -(c_cm_p*T_c + ql_c*L_v)
+
+            # XXX: There appears to be something wrong with the formulation that
+            # includes liquid and ice, use just the liquid formulation for now
+            # Ds = (c_em_p*T_e - ql_e*L_v - qi_e*L_s)\
+                # -(c_cm_p*T_c - ql_c*L_v - qi_c*L_s)
+        else:
+            # previously the moist static energy was used for the cloud mixture
+            # and for the environment only dry air was included which lead to
+            # inconsistencies
+            Ds = cp_d*T_e - cp_d*T_c
+
+            c_cm_p = cp_d
+            c_em_p = cp_d
+
 
         mu = self.beta/r_c
-
 
         return  -g/c_cm_p + mu*Ds/c_cm_p + L_v/c_cm_p*dql_c__dz + L_s/c_cm_p*dqi_c__dz
 
@@ -529,7 +537,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         dqv_c__dz = - dql_c__dz - dqi_c__dz
 
         # in-cloud mixture density
-        rho_c = self._cloud_mixture_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+        rho_c = self.cloud_mixture_density(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
 
         # in-cloud gas density
         rho_cg = self._cloud_gas_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c)
@@ -584,7 +592,9 @@ class FullThermodynamicsCloudEquations(CloudModel):
         dFdz_[Var.w] = dwdz_
 
         # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
-        dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0, T_e=T_e)
+        qv_e = self.environment.rel_humidity(z)*self.microphysics.parameterisations.pv_sat.qv_sat(T=T_e, p=p)
+        dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0,
+                            T_e=T_e, qv_e=qv_e)
 
         dFdz_[Var.T] = dTdz_s
 
@@ -730,7 +740,7 @@ class FixedRiseRateParcel(CloudModel):
         else:
             return False
 
-    def _cloud_mixture_density_from_eos(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
+    def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
         """
         Compute the mixture density from the import full equation of state
 
