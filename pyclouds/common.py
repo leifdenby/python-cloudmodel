@@ -78,6 +78,7 @@ ATHAM_constants = {
         'a0_ice': 22.33,
         'a1_ice': -2.,
     },
+    "g": 9.80616,
 }
 
 def make_related_constants(constants):
