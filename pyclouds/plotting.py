@@ -72,10 +72,9 @@ def hydrometeor_profile_plot(F, z, Te, p_e):
     plot.grid(True)
 
 
-def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram'], initial_condition=None, labels_ncol=2, label_f=None):
-
+def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram'], initial_condition=None, labels_ncol=2, label_f=None, col_max=3):
     n = len(variables)
-    c = n > 3 and 3 or n
+    c = n > col_max and col_max or n
     r = int(math.ceil(float(n)/c))
 
     gs = gridspec.GridSpec(r, c)
@@ -133,6 +132,28 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
 
                 if v == 'r_c':
                     profile_data = 1.0e6*np.array(profile_data)
+            elif v == 'rho_c':
+                z = profile.z
+                p = profile.cloud_model.environment.p(z)
+                T = profile.F[:,Var.T]
+                qv_c = profile.F[:,Var.q_v]
+                ql_c = profile.F[:,Var.q_r]
+                qi_c = profile.F[:,Var.q_i]
+                qd_c = 1. - qv_c - ql_c - qi_c
+                profile_data = profile.cloud_model.cloud_mixture_density(p=p, T_c=T, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+                ref_plot_func = lambda: plot.plot(profile.cloud_model.environment.rho(profile.z), profile.z, marker='', label='environment')
+            elif v == 'd_rho':
+                z = profile.z
+                p = profile.cloud_model.environment.p(z)
+                T = profile.F[:,Var.T]
+                qv_c = profile.F[:,Var.q_v]
+                ql_c = profile.F[:,Var.q_r]
+                qi_c = profile.F[:,Var.q_i]
+                qd_c = 1. - qv_c - ql_c - qi_c
+                rho_c = profile.cloud_model.cloud_mixture_density(p=p, T_c=T, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+                rho_e = profile.cloud_model.environment.rho(profile.z)
+
+                profile_data = rho_c - rho_e
             elif i == None:
                 raise NotImplementedError("Variable not found")
             else:
@@ -156,11 +177,15 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 def ref_plot_func():
                     T_e = profile.cloud_model.environment.temp(z)
                     kwargs = { 'P': p/100., 'T': T_e-273.15, 'marker': '.'}
-                    tephigram.plot_temp(**kwargs)
+                    T_line, =tephigram.plot_temp(**kwargs)
+                    T_line.set_linestyle('-')
+                    T_line.set_marker('')
 
                     RH = profile.F[:,Var.q_v]/parameterisations.pv_sat.qv_sat(T=T, p=p)
                     kwargs = { 'P': p/100., 'T': T-273.15, 'RH': RH }
                     RH_line, = tephigram.plot_RH(**kwargs)
+                    RH_line.set_linestyle(":")
+                    RH_line.set_marker('')
 
                     kwargs = { 'P': p/100., 'T': T-273.15, 'marker': '', 'color': 'black', 'label': 'environment',
                             'with_height_markers': z, 'marker_interval': 500, }
@@ -239,6 +264,12 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 elif v == 'Nc':
                     plot.ylabel('height [m]')
                     plot.xlabel('cloud droplet number [1/m^3]')
+                elif v == 'rho_c':
+                    plot.ylabel('height [m]')
+                    plot.xlabel('in-cloud density [kg/m3]')
+                elif v == 'd_rho':
+                    plot.ylabel('height [m]')
+                    plot.xlabel('density difference to environment [kg/m3]')
                 else:
                     raise NotImplementedError
 
