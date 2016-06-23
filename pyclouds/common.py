@@ -81,6 +81,24 @@ ATHAM_constants = {
     "g": 9.80616,
 }
 
+UCLALES_constants = {
+    "cp_d": 1005.,
+    "R_d": 187.04,
+    "L_v": 2500000.,
+    "cp_l": 4183.,
+    "cp_i": 2103.,
+    "rho_l": 1000.,
+    "rho_i": 900.,
+    "pv_sat": {
+        'p0vs': 610.78000,
+        'a0_lq': 17.2693882,
+        'a1_lq': -35.860000,
+        'a0_ice': 21.8745574,
+        'a1_ice': -7.66,
+    },
+    "g": 9.8,
+}
+
 def make_related_constants(constants):
     if 'cp_d' in constants and 'cp_v' in constants and not 'R_d' in constants:
         constants['R_d'] = constants['cp_d'] - constants['cv_d']
