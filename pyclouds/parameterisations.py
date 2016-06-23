@@ -125,6 +125,53 @@ class SaturatedAdiabaticLapseRate(BaseParameterisation):
 
         return dTdz_moist
 
+class DynamicViscosity(BaseParameterisation):
+    default_constants = {}
+
+    class Implementations:
+        ROGERS_AND_YAU = 0
+        G_THOMPSON = 1
+
+    def __init__(self, implementation=Implementations.ROGERS_AND_YAU, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        assert implementation in DynamicViscosity.Implementations.__dict__.values()
+
+        self.implementation = implementation
+
+    @np.vectorize
+    def __thompson(T):
+        """
+        from G. Thompson '07 microphysics scheme
+        """
+        Tc = T - 273.15
+
+        if Tc > 0.0:
+            return (1.718 + 0.0049*Tc)*1.0e-5
+        else:
+            return (1.718 + 0.0049*Tc - 1.2e-5*Tc**2.)*1.0e-5
+
+
+    def __call__(self, T):
+        """
+        Sources:
+            Rogers & Yau 1989
+        """
+        if self.implementation == self.Implementations.ROGERS_AND_YAU:
+            return 1.72e-5*(393./(T + 120.))*(T/273.)**(3./2.)
+        elif self.implementation == self.Implementations.G_THOMPSON:
+            return self.__thompson(T)
+        else:
+            raise NotImplementedError
+
+
+    def __str__(self):
+        if self.implementation == self.Implementations.ROGERS_AND_YAU:
+            return "Rogers & Yau 1989"
+        elif self.implementation == self.Implementations.G_THOMPSON:
+            return "G. Thompson '07 microphysics"
+        else:
+            raise NotImplementedError
+
 
 class ThermalConductivityCoefficient(BaseParameterisation):
     default_constants = {
@@ -156,10 +203,11 @@ class WaterVapourDiffusionCoefficient(BaseParameterisation):
         b = self.constants.b
         T0 = 273.15
 
-        # tabulated values in Rogers & Yau are given for p=10000Pa reference pressure,
+        # tabulated values in Rogers & Yau are given for p=100kPa=100000Pa reference pressure,
         # have to scale by pressure get the correct diffusivity
+        p0 = 100e3
 
-        return a*(T/T0)**b*10000./p
+        return a*(T/T0)**b*p0/p
 
     def __str__(self):
         constants_label_s = {

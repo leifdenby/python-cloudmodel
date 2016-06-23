@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plot
+from matplotlib.gridspec import GridSpec
 from scipy import optimize
 
 from pyclouds import parameterisations
@@ -8,7 +9,7 @@ plot.ion()
 
 # from Houghton (1985) via Rogers & Yau (1989)
 data_tabulated = np.rec.fromarrays(np.array([
-    [-40.0, 1.152e-5,   2.07e-2,    1.62e-5],
+    [-40.0, 1.512e-5,   2.07e-2,    1.62e-5],
     [-30.0, 1.564e-5,   2.16e-2,    1.76e-5],
     [-20.0, 1.616e-5,   2.24e-2,    1.91e-5],
     [-10.0, 1.667e-5,   2.32e-2,    2.06e-5],
@@ -24,27 +25,47 @@ dtype=[
     ('D', 'f8')] # coefficient of diffusion of water vapour in air [m2 s-1]
 )
 
-
+# plot ranges
 dT = np.max(data_tabulated.temp) - np.min(data_tabulated.temp)
 T_c = np.linspace(np.min(data_tabulated.temp) - 0.2*dT, np.max(data_tabulated.temp) + 0.2*dT)
 
+
+# reference pressure
 p = 101325.0
 
 
 plot.figure(figsize=(10,20))
+plot_grids = iter(GridSpec(3,1))
+
+
+plot.subplot(plot_grids.next())
+
+mu__rogers_and_yau = parameterisations.DynamicViscosity(implementation=parameterisations.DynamicViscosity.Implementations.ROGERS_AND_YAU)
+mu__thompson = parameterisations.DynamicViscosity(implementation=parameterisations.DynamicViscosity.Implementations.G_THOMPSON)
+for model in [mu__rogers_and_yau, mu__thompson]:
+    plot.plot(T_c, model(T=T_c+273.15), label=str(model), marker='', linestyle=':')
+
+plot.plot(data_tabulated.temp, data_tabulated.mu, label="Rogers & Yau (tabulated)", marker='s', linestyle='')
+plot.xlabel("Temperature [C]")
+plot.ylabel("Dynamic viscosity of air [kg/m/s]")
+plot.legend(loc='lower right')
+plot.grid(True)
+plot.title("Dynamic viscosity of air")
+
+
+plot.subplot(plot_grids.next())
 
 Ka = parameterisations.Ka
-
-plot.subplot(211)
 plot.plot(T_c, Ka(T_c+273.15), label=str(Ka), marker='', linestyle=':')
-plot.plot(data_tabulated.temp, data_tabulated.K, label="Rogers & Yau", marker='s', linestyle='')
+plot.plot(data_tabulated.temp, data_tabulated.K, label="Rogers & Yau (tabulated)", marker='s', linestyle='')
 plot.xlabel("Temperature [C]")
 plot.ylabel("Thermal conductivity of air [J m-1 s-1 K-1]")
 plot.legend(loc='lower right')
 plot.grid(True)
 plot.title("Thermal conductivity of air")
 
-plot.subplot(212)
+
+plot.subplot(plot_grids.next())
 
 Dv_ATHAM_constants = parameterisations.WaterVapourDiffusionCoefficient.ATHAM_constants
 Dv_ATHAM = parameterisations.WaterVapourDiffusionCoefficient(constants=Dv_ATHAM_constants)
@@ -60,7 +81,7 @@ plot.grid(True)
 
 for model in [Dv_ATHAM, Dv__fitted, Dv]:
     plot.plot(T_c, model(T_c+273.15, p=p), label=str(model), marker='', linestyle=':')
-plot.plot(data_tabulated.temp, data_tabulated.D, label="Rogers & Yau", marker='s', linestyle='')
+plot.plot(data_tabulated.temp, data_tabulated.D, label="Rogers & Yau (tabulated)", marker='s', linestyle='')
 plot.xlabel("Temperature [C]")
 plot.ylabel("Coefficient of diffusion of water vapour in air [m2 s-1]")
 plot.legend(loc='lower right')
