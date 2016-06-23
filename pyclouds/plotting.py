@@ -155,7 +155,9 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
 
                 profile_data = rho_c - rho_e
             elif i == None:
-                raise NotImplementedError("Variable not found")
+                if v in ['Nc', 'r_c',]:
+                    continue
+                raise NotImplementedError("Variable `{}` not found".format(v))
             else:
                 profile_data = profile.F[:,i]
 
@@ -276,7 +278,9 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
         if scale_by_max and d_max != 0.0:
             dx = 0.1*d_max
             plot.xlim(0.-dx,d_max+dx)
-        plot.ylim(0., None)
+        ylim = plot.gca().get_ylim()
+        if ylim[1] - ylim[0] > 400.0:
+            plot.ylim(0., None)
 
         if ref_plot_func is not None:
             ref_lines += ref_plot_func()
@@ -355,6 +359,9 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
                 p = evolution.F[:,Var.p]
                 if hasattr(evolution.model, 'qv_sat'):
                     q_v__sat = evolution.model.qv_sat(T=T, p=p)
+                elif hasattr(evolution.model, 'constants'):
+                    model_parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=evolution.model.constants)
+                    q_v__sat = model_parameterisations.pv_sat.qv_sat(T=T, p=p)
                 else:
                     warnings.warn("Using default constant for calculating `qv_sat` for %s" % str(evolution))
                     q_v__sat = parameterisations.pv_sat.qv_sat(T=T, p=p)

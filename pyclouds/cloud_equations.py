@@ -141,9 +141,9 @@ class CloudModel(object):
     def integrate(self, initial_condition, z, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3, fail_on_nan=False):
         self._validate_initial_state(initial_condition)
 
-        rtol = 0.001
-        atol_q = 1.0e-5
-        min_step = 0.1
+        rtol = 0.01
+        atol_q = 1.0e-10
+        min_step = 0.05
         atol = Var.make_state(p=100., T=0.1, q_v=atol_q, q_l=atol_q, w=0.1, r=10., q_r=atol_q, z=10., q_i=atol_q)
 
         solver = SolverClass(self.dFdz, rtol=rtol, atol=atol, min_step=min_step)

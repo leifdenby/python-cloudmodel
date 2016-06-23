@@ -3,3 +3,4 @@ unified_microphysics.so
 *.mod
 *.so
 tests/.cache/
+notebooks/src/odespy

@@ -184,12 +184,10 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
         return "Moist adjustment (%s)" % self.model_constraint
 
 class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
-    def __init__(self, r_crit=5.0e-6, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(FiniteCondensationTimeMicrophysics, self).__init__(*args, **kwargs)
-
         self.N0 = 200*1.e6  # initial aerosol number concentration [m-3]
         self.r0 = 0.1e-6  # cloud droplet initial radius
-        self.r_crit = r_crit  # critical cloud droplet radius [m] after which the number of cloud droplets is increased
         self.debug = True
         self.disable_rain = kwargs.get('disable_rain', False)
 
@@ -369,6 +367,66 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         return max(dqr_dt, 0.0)
 
+    def dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
+        Lv = self.constants.L_v
+        R_v = self.constants.R_v
+        R_d = self.constants.R_d
+        rho_l = self.constants.rho_l
+
+        # condensation evaporation of cloud droplets (given number of droplets
+        # and droplet radius calculated above)
+        qv_sat = self.parameterisations.pv_sat.qv_sat(T=T, p=p)
+        Sw = qv/qv_sat
+
+        # number of aerosols stays constant (to add aerosol activation only a
+        # fraction if the original present aerosols would be "activated" at
+        # this point)
+        Nc = self.N0
+
+        if ql == 0.0:
+            if Sw > 1.0:
+                r_c = self.r0
+            else:
+                r_c = 0.0
+        else:
+            r_c = (ql*rho/(4./3.*pi*self.N0*rho_l))**(1./3.)
+            # droplet's should at least be as big as their initial (aerosol) size
+            r_c = max(self.r0, r_c)
+
+        Ka = self.parameterisations.Ka(T=T)
+        Fk = (Lv/(R_v*T) - 1)*Lv/(Ka*T)
+
+        pv_sat = self.parameterisations.pv_sat(T=T)
+        Dv = self.parameterisations.Dv(T=T, p=p)
+        Fd = R_v*T/(pv_sat*Dv)
+
+        # compute rate of change of condensate from diffusion
+        dql_dt = 4*pi*rho_l/rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
+
+        if self.debug and hasattr(self, 'extra_vars'):
+            self.extra_vars.setdefault('r_c', []).append(r_c)
+            self.extra_vars.setdefault('Nc', []).append(Nc)
+
+        return dql_dt
+
+    def __str__(self):
+        s = "Finite condensation rate (no max droplet radius), %s)" % self.model_constraint
+        if self.disable_rain:
+            s += " without rain"
+        return s
+
+class FiniteCondesiationTimeMaxRadiusMicrophysics(FiniteCondensationTimeMicrophysics):
+    """
+    Kept for comparison. This model contains the original
+    condensation/evaporation rate where the cloud-droplet size was forced to
+    have a maximum value. This leads to a unphysically high number of
+    cloud-droplets and therefore the droplet number was instead kept constant
+    in a later versions.
+    """
+    def __init__(self, *args, **kwargs):
+        super(self.__class__, self).__init__(*args, **kwargs)
+        r_crit=5.0e-6
+        self.r_crit = r_crit  # critical cloud droplet radius [m] after which the number of cloud droplets is increased
 
     def dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
         Lv = self.constants.L_v
@@ -415,15 +473,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         return dql_dt
 
-
-    def __str__(self):
-        s = "Finite condensation rate ($r_{crit}=%gm$, %s)" % (self.r_crit, self.model_constraint)
-        if self.disable_rain:
-            s += " without rain"
-        return s
-
 class FC_min_radius(FiniteCondensationTimeMicrophysics):
-
     def dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
         Lv = self.constants.L_v
         R_v = self.constants.R_v
