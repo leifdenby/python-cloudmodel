@@ -250,8 +250,10 @@ class ParametersationsWithSpecificConstants:
         self.Ka = self.__wrap(ThermalConductivityCoefficient, constants, 'Ka')
         self.Dv = WaterVapourDiffusionCoefficient()
         self.dTdz_moist = SaturatedAdiabaticLapseRate(constants)
+        self.dyn_visc = DynamicViscosity(constants=constants)
 
 pv_sat = SaturationVapourPressure()
 Ka = ThermalConductivityCoefficient()
 Dv = WaterVapourDiffusionCoefficient()
 dTdz = SaturatedAdiabaticLapseRate()
+dyn_visc = DynamicViscosity()
