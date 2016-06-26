@@ -396,7 +396,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         self.beta = beta
 
 
-    def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
+    def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qr_c, qi_c):
         """
         Compute the mixture density from the import full equation of state
 
@@ -411,7 +411,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         rho_l = self.constants.rho_l
         rho_i = self.constants.rho_i
 
-        rho_inv = (qd_c*R_d + qv_c*R_v)*T_c/p + ql_c/rho_l + qi_c/rho_i
+        rho_inv = (qd_c*R_d + qv_c*R_v)*T_c/p + (ql_c + qr_c)/rho_l + qi_c/rho_i
         
         return 1.0/rho_inv
 
@@ -434,7 +434,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         return p/(T_c*R_s)
 
 
-    def dw_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, rho_e):
+    def dw_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, qr_c, rho_e):
         """
         Momentum equation
 
@@ -443,7 +443,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
             r: cloud radius
             rho_c: cloud density
         """
-        rho_c = self.cloud_mixture_density(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+        rho_c = self.cloud_mixture_density(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c, qr_c=qr_c)
 
         g = self.constants.g
 
@@ -507,7 +507,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         return  -g/c_cm_p + mu*Ds/c_cm_p + L_v/c_cm_p*dql_c__dz + L_s/c_cm_p*dqi_c__dz
 
-    def dr_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, dTc_dz, dw_dz):
+    def dr_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qr_c, qi_c, dql_c__dz, dqi_c__dz, dTc_dz, dw_dz):
         """
         Mass conservation equation
 
@@ -539,7 +539,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         dqv_c__dz = - dql_c__dz - dqi_c__dz
 
         # in-cloud mixture density
-        rho_c = self.cloud_mixture_density(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+        rho_c = self.cloud_mixture_density(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c, qr_c=qr_c)
 
         # in-cloud gas density
         rho_cg = self._cloud_gas_density_from_eos(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c)
@@ -589,12 +589,17 @@ class FullThermodynamicsCloudEquations(CloudModel):
         dFdz_ = np.zeros((Var.NUM,))
 
         # 1. Estimate change in vertical velocity with initial state
-        dwdz_ = self.dw_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, rho_e=rho_e)
+        dwdz_ = self.dw_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qr_c=q_r, qi_c=q_i, rho_e=rho_e)
 
         dFdz_[Var.w] = dwdz_
 
         # 2. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
-        qv_e = self.environment.rel_humidity(z)*self.microphysics.parameterisations.pv_sat.qv_sat(T=T_e, p=p)
+        try:
+            qv_e = self.environment.rel_humidity(z)*self.microphysics.parameterisations.pv_sat.qv_sat(T=T_e, p=p)
+        except AttributeError:
+            warnings.warn("It seems the environmental profile doesn't define a relative humidity so we'll assume it's dry")
+            qv_e = 0.0
+
         dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, dql_c__dz=0.0, dqi_c__dz=0.0,
                             T_e=T_e, qv_e=qv_e)
 
@@ -614,7 +619,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         dFdz_[Var.T] = dTdz_
 
         # 4. Use post microphysics state (and phase changes from microphysics) to estimate radius change
-        drdz_ = self.dr_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, 
+        drdz_ = self.dr_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qr_c=q_r,
                            qi_c=q_i, dql_c__dz=dql_c__dz, dqi_c__dz=dqi_c__dz, dTc_dz=dTdz_, dw_dz=dwdz_)
 
         dFdz_[Var.r] = drdz_
@@ -742,7 +747,7 @@ class FixedRiseRateParcel(CloudModel):
         else:
             return False
 
-    def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qi_c):
+    def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qr_c, qi_c):
         """
         Compute the mixture density from the import full equation of state
 
@@ -757,7 +762,7 @@ class FixedRiseRateParcel(CloudModel):
         rho_l = self.constants.rho_l
         rho_i = self.constants.rho_i
 
-        rho_inv = (qd_c*R_d + qv_c*R_v)*T_c/p + ql_c/rho_l + qi_c/rho_i
+        rho_inv = (qd_c*R_d + qv_c*R_v)*T_c/p + (ql_c + qr_c)/rho_l + qi_c/rho_i
         
         return 1.0/rho_inv
 
