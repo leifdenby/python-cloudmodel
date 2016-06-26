@@ -190,6 +190,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         self.r0 = 0.1e-6  # cloud droplet initial radius
         self.debug = True
         self.disable_rain = kwargs.get('disable_rain', False)
+        self.disable_rain_condevap = kwargs.get('disable_rain_condevap', False)
 
     def integrate(self, *args, **kwargs):
         evolution = super(FiniteCondensationTimeMicrophysics, self).integrate(*args, **kwargs)
@@ -308,21 +309,26 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         # gas density
         rho_g = self.calc_mixture_density(qd=qd, qv=qv, ql=0., qi=0., qr=0., p=p, T=T)
 
-        dql_dt = self.dql_dt__cond_evap(rho=rho, rho_g=rho_g, qv=qv, ql=ql, T=T, p=p)
+        dql_dt = self._dql_dt__cond_evap(rho=rho, rho_g=rho_g, qv=qv, ql=ql, T=T, p=p)
 
         qg = qv + qd
         dqr_dt_1 = self._dqr_dt__autoconversion(ql=ql, qg=qg, rho_g=rho_g)
         dqr_dt_2 = self._dqr_dt__accretion(ql=ql, qg=qg, qr=qr, rho_g=rho_g)
+        dqr_dt_condevap = self._dqr_dt__cond_evap(qv=qv, qr=qr, rho=rho, p=p, T=T)
 
         dqr_dt = dqr_dt_1 + dqr_dt_2
 
         if self.disable_rain:
             dqr_dt = 0.0
+            dqr_dt_condevap = 0.0
+
+        if self.disable_rain_condevap:
+            dqr_dt_condevap = 0.0
 
         dFdt = np.zeros((Var.NUM))
         dFdt[Var.q_l] =  dql_dt -dqr_dt
-        dFdt[Var.q_v] = -dql_dt
-        dFdt[Var.q_r] =          dqr_dt
+        dFdt[Var.q_v] = -dql_dt         -dqr_dt_condevap
+        dFdt[Var.q_r] =          dqr_dt +dqr_dt_condevap
 
         if self.model_constraint == 'isometric':
             c_m = self.cv_m(F=F)
@@ -355,6 +361,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         return dqr_dt
 
     def _dqr_dt__accretion(self, rho_g, ql, qg, qr):
+        # TODO: rederive these equations to verify that they are correct
         rho_l = self.constants.rho_l
         G3p5 = 3.32399614155  # = Gamma(3.5)
         N0r = 1.e7  # [m^-4]
@@ -367,7 +374,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         return max(dqr_dt, 0.0)
 
-    def dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
+    def _dql_dt__cond_evap(self, rho, rho_g, qv, ql, T, p):
         Lv = self.constants.L_v
         R_v = self.constants.R_v
         R_d = self.constants.R_d
@@ -394,11 +401,11 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
             r_c = max(self.r0, r_c)
 
         Ka = self.parameterisations.Ka(T=T)
-        Fk = (Lv/(R_v*T) - 1)*Lv/(Ka*T)
+        Fk = (Lv/(R_v*T) - 1)*Lv/(Ka*T)*rho_l
 
         pv_sat = self.parameterisations.pv_sat(T=T)
         Dv = self.parameterisations.Dv(T=T, p=p)
-        Fd = R_v*T/(pv_sat*Dv)
+        Fd = R_v*T/(pv_sat*Dv)*rho_l
 
         # compute rate of change of condensate from diffusion
         dql_dt = 4*pi*rho_l/rho*Nc*r_c*(Sw - 1.0)/(Fk + Fd)
@@ -409,10 +416,76 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         return dql_dt
 
+    def _dqr_dt__cond_evap(self, qv, qr, rho, T, p):
+        """
+        Condensation and evaporation of rain. Similar to cloud-water droplet
+        condensation/evaporation but includes corrections for "ventilation" and
+        ??. 
+        
+        Also droplet size is assumed to following a Marshall-Palmer distribution:
+
+            N(r)dr = N0 exp(-l*r) dr
+        """
+        Lv = self.constants.L_v
+        G2p75 = 1.608359421985546  # = Gamma(2.75)
+        rho_l = self.constants.rho_l
+        R_v = self.constants.R_v
+        
+        # droplet-size distribution constant
+        N0 = 1.0e7 # [m^-4]
+
+        # fall-speed coefficient taken from the r > 0.5mm expression for
+        # fall-speed from Herzog '98
+        a_r = 201.
+        # reference density
+        rho0 = 1.12
+
+
+        # can't do cond/evap without any rain-droplets present
+        if qr == 0.0:
+            return 0.0
+
+        # computer super/sub-saturation
+        qv_sat = self.parameterisations.pv_sat.qv_sat(T=T, p=p)
+        Sw = qv/qv_sat
+
+        # size-distribtion length-scale
+        l = (8.*rho_l*pi*N0/(qr*rho))**.25
+
+        if self.debug and hasattr(self, 'extra_vars'):
+            w_r = a_r*np.sqrt(1./l*rho0/rho)
+            self.extra_vars.setdefault('w_r', []).append(w_r)
+            self.extra_vars.setdefault('lambda_r', []).append(l)
+            Nr = N0/l
+            self.extra_vars.setdefault('Nr', []).append(Nr)
+
+        # air condutivity and diffusion effects
+        Ka = self.parameterisations.Ka(T=T)
+        Fk = (Lv/(R_v*T) - 1)*Lv/(Ka*T)*rho_l
+
+        pv_sat = self.parameterisations.pv_sat(T=T)
+        Dv = self.parameterisations.Dv(T=T, p=p)
+        Fd = R_v*T/(pv_sat*Dv)*rho_l
+
+        # compute the ventilation coefficient `f`
+        # fall-velocity
+        # dynamic viscosity
+        mu = self.parameterisations.dyn_visc(T=T)
+
+        f = 1. + 0.22*(2.*a_r*rho/mu)**.5*(rho0/rho)**.25*G2p75/(l**.25)
+
+        # compute rate of change of condensate from diffusion
+        dqr_dt = 4*pi*rho_l/rho*N0/l**2.*(Sw - 1.0)/(Fk + Fd)*f
+
+        return dqr_dt
+
+
     def __str__(self):
         s = "Finite condensation rate (no max droplet radius), %s)" % self.model_constraint
         if self.disable_rain:
             s += " without rain"
+        elif self.disable_rain_condevap:
+            s += " without rain cond/evap"
         return s
 
 class FiniteCondesiationTimeMaxRadiusMicrophysics(FiniteCondensationTimeMicrophysics):
