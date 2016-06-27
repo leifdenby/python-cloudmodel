@@ -420,9 +420,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         """
         Condensation and evaporation of rain. Similar to cloud-water droplet
         condensation/evaporation but includes corrections for "ventilation" and
-        ??. 
-        
-        Also droplet size is assumed to following a Marshall-Palmer distribution:
+        and droplet-size is assumed to follow a Marshall-Palmer distribution:
 
             N(r)dr = N0 exp(-l*r) dr
         """
@@ -443,6 +441,12 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         # can't do cond/evap without any rain-droplets present
         if qr == 0.0:
+            if self.debug and hasattr(self, 'extra_vars'):
+                # make sure that we put in some empty values so that plotting
+                # doesn't mess up later
+                self.extra_vars.setdefault('w_r', []).append(np.nan)
+                self.extra_vars.setdefault('lambda_r', []).append(np.nan)
+                self.extra_vars.setdefault('Nr', []).append(np.nan)
             return 0.0
 
         # computer super/sub-saturation
@@ -478,7 +482,6 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         dqr_dt = 4*pi*rho_l/rho*N0/l**2.*(Sw - 1.0)/(Fk + Fd)*f
 
         return dqr_dt
-
 
     def __str__(self):
         s = "Finite condensation rate (no max droplet radius), %s)" % self.model_constraint

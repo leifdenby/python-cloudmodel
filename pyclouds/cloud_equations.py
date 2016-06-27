@@ -433,7 +433,6 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         return p/(T_c*R_s)
 
-
     def dw_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qi_c, qr_c, rho_e):
         """
         Momentum equation

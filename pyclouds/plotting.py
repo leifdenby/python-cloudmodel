@@ -137,20 +137,22 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 p = profile.cloud_model.environment.p(z)
                 T = profile.F[:,Var.T]
                 qv_c = profile.F[:,Var.q_v]
-                ql_c = profile.F[:,Var.q_r]
+                qr_c = profile.F[:,Var.q_r]
+                ql_c = profile.F[:,Var.q_l]
                 qi_c = profile.F[:,Var.q_i]
                 qd_c = 1. - qv_c - ql_c - qi_c
-                profile_data = profile.cloud_model.cloud_mixture_density(p=p, T_c=T, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+                profile_data = profile.cloud_model.cloud_mixture_density(p=p, T_c=T, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c, qr_c=qr_c)
                 ref_plot_func = lambda: plot.plot(profile.cloud_model.environment.rho(profile.z), profile.z, marker='', label='environment')
             elif v == 'd_rho':
                 z = profile.z
                 p = profile.cloud_model.environment.p(z)
                 T = profile.F[:,Var.T]
                 qv_c = profile.F[:,Var.q_v]
-                ql_c = profile.F[:,Var.q_r]
+                qr_c = profile.F[:,Var.q_r]
+                ql_c = profile.F[:,Var.q_l]
                 qi_c = profile.F[:,Var.q_i]
                 qd_c = 1. - qv_c - ql_c - qi_c
-                rho_c = profile.cloud_model.cloud_mixture_density(p=p, T_c=T, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c)
+                rho_c = profile.cloud_model.cloud_mixture_density(p=p, T_c=T, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c, qr_c=qr_c)
                 rho_e = profile.cloud_model.environment.rho(profile.z)
 
                 profile_data = rho_c - rho_e
