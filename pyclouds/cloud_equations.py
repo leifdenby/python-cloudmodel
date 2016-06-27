@@ -612,11 +612,19 @@ class FullThermodynamicsCloudEquations(CloudModel):
         dFdz_micro = dFdt_micro/w  # w = dz/dt
         dFdz_ += dFdz_micro
 
-        dql_c__dz = dFdz_micro[Var.q_l]
-        dqi_c__dz = dFdz_micro[Var.q_i]
-        dTdz_ = dTdz_s + dFdz_micro[Var.T]
+        # assume no condesates present in environment
+        ql_e, qr_e, qi_e = 0., 0., 0.
 
-        dFdz_[Var.T] = dTdz_
+        # as well as tracer (water) changes from microphysics we have to consider entrainment
+        mu = self.beta/r
+        dFdz_[Var.q_v] += mu*(qv_e - q_v)
+        dFdz_[Var.q_l] += mu*(ql_e - q_l)
+        dFdz_[Var.q_r] += mu*(qr_e - q_r)
+        dFdz_[Var.q_i] += mu*(qi_e - q_i)
+
+        dql_c__dz = dFdz_[Var.q_l]
+        dqi_c__dz = dFdz_[Var.q_i]
+        dTdz_     = dFdz_[Var.T]
 
         # 4. Use post microphysics state (and phase changes from microphysics) to estimate radius change
         drdz_ = self.dr_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qr_c=q_r,
