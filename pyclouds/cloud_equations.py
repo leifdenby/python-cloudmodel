@@ -17,8 +17,8 @@ class CloudProfile():
         self.cloud_model = cloud_model
         self.extra_vars = extra_vars
 
-    def plot(self):
-        return plotting.plot_profiles([self,], variables=['r', 'w', 'T',])
+    def plot(self, variables=('r', 'w', 'T')):
+        return plotting.plot_profiles([self,], variables=variables)
 
     def __str__(self):
         return str(self.cloud_model)
@@ -476,7 +476,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         g = self.constants.g
 
         if self.entrain_moist_static_energy:
-            # heat capacity of cloud mixture
+            # heat capacity of mixture with all moisture in the vapour phase
             c_cm_p = cp_d*qd_c + cp_v*(qv_c + ql_c + qi_c)
 
             qd_e = 1.0 - qv_e
