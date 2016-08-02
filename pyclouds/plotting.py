@@ -72,14 +72,15 @@ def hydrometeor_profile_plot(F, z, Te, p_e):
     plot.grid(True)
 
 
-def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram'], initial_condition=None, labels_ncol=2, label_f=None, col_max=3):
+def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigram'], initial_condition=None, labels_ncol=2, label_f=None, col_max=3, fig=None):
     n = len(variables)
     c = n > col_max and col_max or n
     r = int(math.ceil(float(n)/c))
 
     gs = gridspec.GridSpec(r, c)
 
-    fig = plot.figure(figsize=(6*c,7*r))
+    if fig is None:
+        fig = plot.figure(figsize=(6*c,7*r))
 
     lines = []
     for n, (v, s) in enumerate(zip(variables, list(gs))):
@@ -105,18 +106,39 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
         for n_profile, profile in enumerate(profiles):
             z = profile.z
 
-            if v == 'mse':
-                raise NotImplementedError
-                # TODO: Reimplement this, so that it uses mse calculation from model
-                # profile_data = utils.Utils(profile.cloud_model.constants).moist_static_energy(profile.F, profile.z)/1.e3
-                # if n_profile == 0:
-                    # def ref_plot_func():
-                        # z = profile.z
-                        # Te = profile.cloud_model.environment.temp(z)
-                        # F_e = np.zeros((profile.F.shape))
-                        # F_e[...,Var.T] = Te
-                        # environment_mse = utils.Utils(profile.cloud_model.constants).moist_static_energy(F_e, profile.z)/1.e3
-                        # return plot.plot(environment_mse, z, marker='', label='environment')
+            if v == 'd_mse':
+                constants = profile.cloud_model.constants
+                cp_d = constants.cp_d
+                cp_v = constants.cp_v
+                L_v = constants.L_v
+                L_s = constants.L_s
+
+                z = profile.z
+                p = profile.cloud_model.environment.p(z)
+                T_e = profile.cloud_model.environment.temp(z)
+
+                T_c = profile.F[:,Var.T]
+                qv_c = profile.F[:,Var.q_v]
+                qr_c = profile.F[:,Var.q_r]
+                ql_c = profile.F[:,Var.q_l]
+                qi_c = profile.F[:,Var.q_i]
+                qd_c = 1. - qv_c - ql_c - qi_c
+
+                c_cm_p = cp_d*qd_c + cp_v*(qv_c + ql_c + qi_c)
+
+                qv_sat__f = parameterisations.ParametersationsWithSpecificConstants(constants=constants).pv_sat.qv_sat
+                qv_e__sat = qv_sat__f(T=T_e, p=p)
+                rh_e = profile.cloud_model.environment.rel_humidity(z)
+                qv_e = rh_e*qv_e__sat
+                qd_e = 1.0 - qv_e
+                ql_e, qi_e = 0.0, 0.0
+
+                c_em_p = cp_d*qd_e + cp_v*(qv_e + ql_e + qi_e)
+
+                Ds = (c_em_p*T_e + ql_e*L_v)\
+                    -(c_cm_p*T_c + ql_c*L_v)
+
+                profile_data = -Ds/1000.
             elif v == 'Sw':
                 profile_data = None
             elif hasattr(profile, 'extra_vars') and v in profile.extra_vars:
@@ -155,7 +177,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 rho_c = profile.cloud_model.cloud_mixture_density(p=p, T_c=T, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c, qr_c=qr_c)
                 rho_e = profile.cloud_model.environment.rho(profile.z)
 
-                profile_data = rho_c - rho_e
+                profile_data = (rho_c - rho_e)*1000.
             elif i == None:
                 if v in ['Nc', 'r_c',]:
                     continue
@@ -185,7 +207,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     T_line.set_linestyle('-')
                     T_line.set_marker('')
 
-                    RH = profile.F[:,Var.q_v]/parameterisations.pv_sat.qv_sat(T=T, p=p)
+                    RH = profile.cloud_model.environment.rel_humidity(z)
                     kwargs = { 'P': p/100., 'T': T-273.15, 'RH': RH }
                     RH_line, = tephigram.plot_RH(**kwargs)
                     RH_line.set_linestyle(":")
@@ -259,9 +281,9 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     plot.ylabel('height [m]')
                     plot.xlabel('rain water specific concentration [kg/kg]')
                     scale_by_max = True
-                elif v == 'mse':
+                elif v == 'd_mse':
                     plot.ylabel('height [m]')
-                    plot.xlabel('Moist static energy [kJ]')
+                    plot.xlabel('Moist static energy difference to environment [kJ/m^3]')
                 elif v == 'r_c':
                     plot.ylabel(r'height [$m$]')
                     plot.xlabel('cloud-droplet radius [$\mu m$]')
@@ -273,7 +295,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     plot.xlabel('in-cloud density [kg/m3]')
                 elif v == 'd_rho':
                     plot.ylabel('height [m]')
-                    plot.xlabel('density difference to environment [kg/m3]')
+                    plot.xlabel('density difference to environment [g/m^3]')
                 else:
                     raise NotImplementedError
 
@@ -297,8 +319,11 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
     if initial_condition is not None:
         title += '\n' + Var.repr(initial_condition)
 
+    if all([p.cloud_model.environment == profiles[0].cloud_model.environment for p in profiles]):
+        title += '\nIn {}'.format(str(profiles[0].cloud_model.environment))
+
     fig.subplots_adjust(bottom=0.15)
-    plot.suptitle(title)
+    plot.suptitle(title, fontsize=14)
 
     return fig
 
