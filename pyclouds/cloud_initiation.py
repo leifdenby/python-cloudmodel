@@ -61,6 +61,8 @@ def original_CCFM_cloudbase(environment):
     Based of `cloudbase` in `mo_ccfm_cloudbase.f90`
     https://github.com/leifdenby/ccfm/blob/master/src/mo_ccfm_cloudbase.f90
 
+    Returns a tuple of cloudbase (height, temperature, water vapour content)
+
       cl_base = 1
       cond    = .false.
 
