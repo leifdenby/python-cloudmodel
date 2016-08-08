@@ -56,7 +56,7 @@ def compute_LCL(environment, F0):
     raise CloudbaseNotFoundException
 
 
-def original_CCFM_cloudbase(environment):
+def original_CCFM_cloudbase(environment, dqv=0.0, dT=0.0):
     """
     Based of `cloudbase` in `mo_ccfm_cloudbase.f90`
     https://github.com/leifdenby/ccfm/blob/master/src/mo_ccfm_cloudbase.f90
@@ -110,8 +110,8 @@ def original_CCFM_cloudbase(environment):
 
     dz = 10.
     z = 0.
-    T_c = environment.temp(z)
-    qv_c = environment.q_v(z)
+    T_c = environment.temp(z) + dT
+    qv_c = environment.q_v(z) + dqv
 
     # we don't expect a cloud-base above 4km
     while z < 4e3:
