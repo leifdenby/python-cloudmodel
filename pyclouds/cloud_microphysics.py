@@ -413,6 +413,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         if self.debug and hasattr(self, 'extra_vars'):
             self.extra_vars.setdefault('r_c', []).append(r_c)
             self.extra_vars.setdefault('Nc', []).append(Nc)
+            self.extra_vars.setdefault('dql_dt', []).append(dql_dt)
 
         return dql_dt
 
@@ -447,6 +448,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
                 self.extra_vars.setdefault('w_r', []).append(np.nan)
                 self.extra_vars.setdefault('lambda_r', []).append(np.nan)
                 self.extra_vars.setdefault('Nr', []).append(np.nan)
+                self.extra_vars.setdefault('dqr_dt', []).append(np.nan)
             return 0.0
 
         # computer super/sub-saturation
@@ -480,6 +482,9 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
 
         # compute rate of change of condensate from diffusion
         dqr_dt = 4*pi*rho_l/rho*N0/l**2.*(Sw - 1.0)/(Fk + Fd)*f
+
+        if self.debug and hasattr(self, 'extra_vars'):
+            self.extra_vars.setdefault('dqr_dt', []).append(dqr_dt)
 
         return dqr_dt
 
