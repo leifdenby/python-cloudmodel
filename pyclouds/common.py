@@ -138,8 +138,9 @@ class Var:
     q_i = 6
     z = 7
     p = 8
+    q_pr = 9  # TODO: should this really be a m_precip/m_total?
 
-    names = ['r', 'w', 'T', 'q_v', 'q_r', 'q_l', 'q_i', 'z', 'p',]
+    names = ['r', 'w', 'T', 'q_v', 'q_r', 'q_l', 'q_i', 'z', 'p', 'q_pr']
     NUM = len(names)
 
     @staticmethod
