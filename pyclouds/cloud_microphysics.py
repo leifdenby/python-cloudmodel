@@ -489,7 +489,7 @@ class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
         return dqr_dt
 
     def __str__(self):
-        s = "Finite condensation rate (no max droplet radius), %s)" % self.model_constraint
+        s = "Finite condensation rate (no max droplet radius), %s" % self.model_constraint
         if self.disable_rain:
             s += " without rain"
         elif self.disable_rain_condevap:
@@ -686,7 +686,7 @@ class OldATHAMKesslerFortran:
     implemented in the `unified microphysics` codebase.
     """
 
-    def __init__(self, model_constraint='isometric', *args, **kwargs):
+    def __init__(self, model_constraint='isometric', constants=ATHAM_constants, *args, **kwargs):
         if unified_microphysics is None:
             raise Exception("Couldn't import the `unified_microphysics` library, please symlink it to `unified_microphysics.so`")
 
@@ -695,7 +695,7 @@ class OldATHAMKesslerFortran:
 
         unified_microphysics.microphysics_pylib.init('kessler_old', model_constraint)
 
-        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=ATHAM_constants)
+        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
     def integrate(self, initial_condition, t):

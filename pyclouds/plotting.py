@@ -448,7 +448,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
     return fig
 
 
-def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right', initial_condition=None, fig=None, ny=1, global_legend=False, labels=None):
+def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower right', initial_condition=None, fig=None, ny=1, global_legend=False, labels=None, **kwargs):
     n = len(variables)
 
     shape = int(math.ceil(float(n)/ny)), ny
@@ -484,11 +484,24 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
                 else:
                     raise Exception("Variable %s not found" % v)
 
-            color = colors.get(evolution, None)
-            if not color is None:
-                line = plot.plot(evolution_time, evolution_data, label=str(evolution), marker='.', linestyle='', color=color)
+            if v in ['q_v', 'q_l', 'q_r']:
+                evolution_data = 1000.*np.array(evolution_data)
+
+            if 'markers' in kwargs:
+                markers = kwargs['markers']
+                marker = markers[n_evolution]
             else:
-                line = plot.plot(evolution_time, evolution_data, label=str(evolution), marker='.', linestyle='')
+                marker = '.'
+
+            if 'colors' in kwargs:
+                color = kwargs['colors'][n_evolution]
+            else:
+                color = colors.get(evolution, None)
+
+            if not color is None:
+                line = plot.plot(evolution_time, evolution_data, label=str(evolution), marker=marker, linestyle='', color=color)
+            else:
+                line = plot.plot(evolution_time, evolution_data, label=str(evolution), marker=marker, linestyle='')
             if not v in colors:
                 colors[evolution] = line[0].get_color()
             lines += line
@@ -498,9 +511,9 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
             t_max = max(max(evolution.t), t_max)
 
             if v == 'q_l':
-                plot.ylabel('cloud water specific concentration [kg/kg]')
+                plot.ylabel('cloud water specific concentration [g/kg]')
             if v == 'q_v':
-                plot.ylabel('water vapour specific concentration [kg/kg]')
+                plot.ylabel('water vapour specific concentration [g/kg]')
 
                 T = evolution.F[:,Var.T]
                 p = evolution.F[:,Var.p]
@@ -512,6 +525,7 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
                 else:
                     warnings.warn("Using default constant for calculating `qv_sat` for %s" % str(evolution))
                     q_v__sat = parameterisations.pv_sat.qv_sat(T=T, p=p)
+                q_v__sat = 1000.*np.array(q_v__sat)
                 data_min = min(min(q_v__sat), data_min)
                 data_max = max(max(q_v__sat), data_max)
                 color = lines[n_evolution].get_color()
@@ -523,7 +537,7 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
             elif v == 'T':
                 plot.ylabel('Temperature [K]')
             elif v == 'q_r':
-                plot.ylabel('rain specific concentration [kg/kg]')
+                plot.ylabel('rain specific concentration [g/kg]')
             elif v == 'p':
                 plot.ylabel('pressure [Pa]')
 
