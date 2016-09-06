@@ -408,7 +408,6 @@ class FullThermodynamicsCloudEquations(CloudModel):
         self.beta = beta
         self.l_pr = l_pr
 
-
     def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qr_c, qi_c):
         """
         Compute the mixture density from the import full equation of state
@@ -465,7 +464,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         
         return 1.0/w_c * (g/(1.+self.gamma)*B - mu*w_c**2. - self.D*w_c**2./r_c)
 
-    def dT_dz(self, r_c, T_c, qd_c, qv_c, ql_c, qr_c, qi_c, dql_c__dz, dqi_c__dz, dqv_c__dz, T_e, qv_e):
+    def dT_dz(self, r_c, T_c, qd_c, qv_c, ql_c, qi_c, dql_c__dz, dqi_c__dz, dqv_c__dz, T_e, qv_e):
         """
         Constants:
             cp_d: heat capacity of dry air at constant pressure
@@ -490,24 +489,38 @@ class FullThermodynamicsCloudEquations(CloudModel):
             if qi_c != 0.0:
                 raise NotImplementedError
 
+            L_f = self.constants.L_f
+            cp_v = self.constants.cp_v
             cp_l = self.constants.cp_l
-            c_cm_p = cp_d*qd_c + cp_l*(qv_c + ql_c + qr_c + qi_c)
+            cp_i = self.constants.cp_i
+
+            c_cm_p = cp_d*qd_c + cp_l*(qv_c + ql_c + qi_c)
+
+            c_cm = cp_d*qd_c + qv_c*cp_v + ql_c*cp_l + qi_c*cp_i
 
             qd_e = 1.0 - qv_e
             ql_e, qi_e, qr_e = 0.0, 0.0, 0.0
 
-            c_em_p = cp_d*qd_e + cp_l*(qv_e + ql_e + qr_e + qi_e)
+            c_em_p = cp_d*qd_e + cp_l*(qv_e + ql_e + qi_e)
 
             # difference in environment and cloud moist static energy
-            Ds = (c_em_p*T_e + qv_e*L_v)\
-                -(c_cm_p*T_c + qv_c*L_v)
+            Ds = (c_em_p*T_e + qv_e*L_v - qi_e*L_f)\
+                -(c_cm_p*T_c + qv_c*L_v - qi_c*L_f)
 
-            # TODO: include ice phase change
             mu = self.beta/r_c
-            return  -g/c_cm_p + mu*Ds/c_cm_p - L_v/c_cm_p*dqv_c__dz
-            #+ L_f/c_cm_p*dqi_c__dz
+
+            dqd_c__dz = -(dqv_c__dz + dql_c__dz + dqi_c__dz)
+
+            dTdz_q =  T_c*cp_d       *dqd_c__dz\
+                   + (T_c*cp_l + L_v)*dqv_c__dz\
+                   +  T_c*cp_l       *dql_c__dz\
+                   + (T_c*cp_i - L_f)*dqi_c__dz
+
+            return  -g/c_cm + mu*Ds/c_cm - 1./c_cm*dTdz_q
+            #return  -g/c_cm_p + mu*Ds/c_cm_p - T_c/c_cm_p*(cp_d*dqd_c__dz + cp_v*dqv_c__dz + cp_l*dql_c__dz + cp_i*dqi_c__dz)
+            #return  -g/c_cm_p + mu*Ds/c_cm_p + L_v/c_cm_p*dql_c__dz
         elif self.entrain_liquid_static_energy:
-            L_s = self.constants.L_v
+            L_s = self.constants.L_s
             cp_v = self.constants.cp_v
             # XXX: This is *actually* liquid static energy
             # heat capacity of mixture with all moisture in the vapour phase
@@ -532,7 +545,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         else:
             return  -g/cp_d
 
-    def dr_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qr_c, qi_c, dql_c__dz, dqi_c__dz, dTc_dz, dw_dz):
+    def dr_dz(self, p, w_c, r_c, T_c, qd_c, qv_c, ql_c, qr_c, qi_c, dqv_c__dz, dql_c__dz, dqi_c__dz, dTc_dz, dw_dz):
         """
         Mass conservation equation
 
@@ -557,11 +570,8 @@ class FullThermodynamicsCloudEquations(CloudModel):
         rho_i = self.constants.rho_i
         rho_l = self.constants.rho_l
 
-        # XXX: for now assume that specific concentration of in-cloud dry does not change
-        dqd_c__dz = 0.0
-        
-        # XXX: assume that changes in water vapour are exactly opposite to the increase in liquid water and ice
-        dqv_c__dz = - dql_c__dz - dqi_c__dz
+        # Total specific concentration stays unchanged
+        dqd_c__dz = - (dqv_c__dz + dql_c__dz + dqi_c__dz)
 
         # in-cloud mixture density
         rho_c = self.cloud_mixture_density(p=p, T_c=T_c, qd_c=qd_c, qv_c=qv_c, ql_c=ql_c, qi_c=qi_c, qr_c=qr_c)
@@ -679,20 +689,21 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         # 3. Estimate temperature change forgetting about phase-changes for now (i.e. considering only adiabatic adjustment and entrainment)
 
+        # in terms of the thermodynamics cloud-water and rain-water are treated identically
         dql_c__dz = (dFdz_[Var.q_l] + dFdz_[Var.q_r])
         dqi_c__dz = dFdz_[Var.q_i]
         dqv_c__dz = dFdz_[Var.q_v]
+        ql_c = q_l + q_r
 
-        dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qr_c=q_r, qi_c=q_i, 
-                            dql_c__dz=dql_c__dz, dqi_c__dz=dqi_c__dz, dqv_c__dz=dqv_c__dz,
-                            T_e=T_e, qv_e=qv_e)
+        dTdz_s = self.dT_dz(r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=ql_c, qi_c=q_i, dql_c__dz=dql_c__dz,
+                            dqi_c__dz=dqi_c__dz, dqv_c__dz=dqv_c__dz, T_e=T_e, qv_e=qv_e)
 
         dFdz_[Var.T] += dTdz_s
         dTdz_     = dFdz_[Var.T]
 
         # 4. Use post microphysics state (and phase changes from microphysics) to estimate radius change
         drdz_ = self.dr_dz(p=p, w_c=w, r_c=r, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qr_c=q_r,
-                           qi_c=q_i, dql_c__dz=dql_c__dz, dqi_c__dz=dqi_c__dz, dTc_dz=dTdz_, dw_dz=dwdz_)
+                           qi_c=q_i, dqv_c__dz=dqv_c__dz, dql_c__dz=dql_c__dz, dqi_c__dz=dqi_c__dz, dTc_dz=dTdz_, dw_dz=dwdz_)
 
         dFdz_[Var.r] = drdz_
 
@@ -734,7 +745,15 @@ class FullThermodynamicsCloudEquations(CloudModel):
         return dFdz_
 
     def __str__(self):
-        return r"FullSpecConcEqns ($D=%g$, $\beta=%g$), mu-phys: %s" % (self.D, self.beta, str(self.microphysics))
+        model_desc = r"FullSpecConcEqns ($D=%g$, $\beta=%g$, $l_{pr}=%gm$), mu-phys: %s" % (self.D, self.beta, self.l_pr, str(self.microphysics))
+
+        if not self.entrain_moist_static_energy:
+            if self.entrain_liquid_static_energy:
+                return model_desc + " LSE entr."
+            else:
+                return model_desc + " no therm. entr."
+        else:
+            return model_desc
 
 class FullEquationsSatMicrophysics(FullThermodynamicsCloudEquations):
     """
