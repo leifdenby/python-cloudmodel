@@ -398,6 +398,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         self.entrain_moist_static_energy = kwargs.pop('entrain_moist_static_energy', True)
         self.entrain_liquid_static_energy = kwargs.pop('entrain_liquid_static_energy', False)
         self.entrain_hydrometeors = kwargs.pop('entrain_hydrometeors', True)
+        self.temperature_dependent_latent_heats = kwargs.pop('temperature_dependent_latent_heats', True)
         super(FullThermodynamicsCloudEquations, self).__init__(environment=environment, **kwargs)
 
         if self.entrain_moist_static_energy and self.entrain_liquid_static_energy:
@@ -482,21 +483,31 @@ class FullThermodynamicsCloudEquations(CloudModel):
             T_e: environment absolute temp
         """
         cp_d = self.constants.cp_d
-        L_v = self.constants.L_v
+        cp_v = self.constants.cp_v
+        cp_l = self.constants.cp_l
+        cp_i = self.constants.cp_i
+
         g = self.constants.g
+
+        L_v0 = self.constants.L_v
+        L_f0 = self.constants.L_f
+        L_s0 = self.constants.L_s
+
+        if self.temperature_dependent_latent_heats:
+            T00 = 273.15
+            L_v = L_v0 + (cp_v - cp_l)*(T_c - T00)
+            L_s = L_s0 + (cp_v - cp_i)*(T_c - T00)
+            L_f = L_v0 + (cp_l - cp_i)*(T_c - T00)
+        else:
+            L_v = L_v0
+            L_s = L_s0
+            L_f = L_v0
 
         if self.entrain_moist_static_energy:
             if qi_c != 0.0:
                 raise NotImplementedError
 
-            L_f = self.constants.L_f
-            cp_v = self.constants.cp_v
-            cp_l = self.constants.cp_l
-            cp_i = self.constants.cp_i
-
             c_cm_p = cp_d*qd_c + cp_l*(qv_c + ql_c + qi_c)
-
-            c_cm = cp_d*qd_c + qv_c*cp_v + ql_c*cp_l + qi_c*cp_i
 
             qd_e = 1.0 - qv_e
             ql_e, qi_e, qr_e = 0.0, 0.0, 0.0
@@ -511,17 +522,19 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
             dqd_c__dz = -(dqv_c__dz + dql_c__dz + dqi_c__dz)
 
-            dTdz_q =  T_c*cp_d       *dqd_c__dz\
+            # heat changes due to phase changes (and entrainment of species)
+            dedz_q =  T_c*cp_d       *dqd_c__dz\
                    + (T_c*cp_l + L_v)*dqv_c__dz\
                    +  T_c*cp_l       *dql_c__dz\
                    + (T_c*cp_i - L_f)*dqi_c__dz
 
-            return  -g/c_cm + mu*Ds/c_cm - 1./c_cm*dTdz_q
-            #return  -g/c_cm_p + mu*Ds/c_cm_p - T_c/c_cm_p*(cp_d*dqd_c__dz + cp_v*dqv_c__dz + cp_l*dql_c__dz + cp_i*dqi_c__dz)
-            #return  -g/c_cm_p + mu*Ds/c_cm_p + L_v/c_cm_p*dql_c__dz
+            # *actual* mixture heat capacity (if temperature dependency of
+            # latent heats are considered in derivation then the *actual*
+            # mixture heat capacity comes out)
+            c_cm = cp_d*qd_c + qv_c*cp_v + ql_c*cp_l + qi_c*cp_i
+
+            return  -g/c_cm + mu*Ds/c_cm - 1./c_cm*dedz_q
         elif self.entrain_liquid_static_energy:
-            L_s = self.constants.L_s
-            cp_v = self.constants.cp_v
             # XXX: This is *actually* liquid static energy
             # heat capacity of mixture with all moisture in the vapour phase
             c_cm_p = cp_d*qd_c + cp_v*(qv_c + ql_c + qr_c + qi_c)
@@ -746,6 +759,9 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
     def __str__(self):
         model_desc = r"FullSpecConcEqns ($D=%g$, $\beta=%g$, $l_{pr}=%gm$), mu-phys: %s" % (self.D, self.beta, self.l_pr, str(self.microphysics))
+
+        if not self.temperature_dependent_latent_heats:
+            model_desc += ", const $L_{heat}$"
 
         if not self.entrain_moist_static_energy:
             if self.entrain_liquid_static_energy:
