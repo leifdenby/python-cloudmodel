@@ -12,6 +12,7 @@ default_constants = {
     "cv_v": 1402.5, # J/kg/K
     "cp_l": 4183.0,
     "cv_l": 4183.0, # same as cp as liquid is assumed incompressible
+    "cp_i": 2103., # taken from ATHAM
     "rho_l": 1000.,
     "rho_i": 500.,
     "g": 9.80665,
@@ -107,6 +108,8 @@ def make_related_constants(constants):
         constants['cv_i'] = constants['cp_i']
     if 'cp_l' in constants and not 'cv_l' in constants:
         constants['cv_l'] = constants['cp_l']
+    if all([v in constants for v in ('L_s', 'L_v')]) and not 'L_f' in constants:
+        constants['L_f'] = constants['L_s'] - constants['L_v']
     return constants
 
 um_constants = {
