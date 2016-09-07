@@ -80,7 +80,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
     gs = gridspec.GridSpec(r, c)
 
     if fig is None:
-        fig = plot.figure(figsize=(6*c,7*r))
+        fig = plot.figure(figsize=(6*c,4*r))
 
     lines = []
     for n, (v, s) in enumerate(zip(variables, list(gs))):
