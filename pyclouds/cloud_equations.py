@@ -10,6 +10,7 @@ from scipy.constants import pi
 from common import AttrDict, Var, default_constants
 import cloud_microphysics
 
+import integrators
 
 class CloudProfile():
     def __init__(self, F, z, cloud_model, extra_vars={}):
@@ -53,8 +54,8 @@ class CloudModel(object):
             print "Integration stopped: vertical velocity dropped to zero"
             print F_top[Var.w]
             return True
-        elif F_top[Var.r] > 100e3:
-            print "Integration stopped: cloud radius became unreasonably high (r>100km)"
+        elif F_top[Var.r] > 10e3:
+            print "Integration stopped: cloud radius became unreasonably high (r>10km)"
             return True
         elif z_top > 30e3:
             print "Integration stopped: height reached too high (z > 30km)"
@@ -80,8 +81,8 @@ class CloudModel(object):
         elif F_top[Var.T] < 0.0:
             print "Integration stopped: temperature dropped below zero"
             return True
-        elif F_top[Var.r] > 100e3:
-            print "Integration stopped: cloud radius became unreasonably high (r>100km)"
+        elif F_top[Var.r] > 20e3:
+            print "Integration stopped: cloud radius became unreasonably high (r>20km)"
             return True
         elif F_top[Var.z] < 0.0:
             print "Integration stopped: height below ground"
@@ -144,12 +145,16 @@ class CloudModel(object):
     def integrate(self, initial_condition, z, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3, fail_on_nan=False):
         self._validate_initial_state(initial_condition)
 
-        rtol = 0.01
-        atol_q = 1.0e-10
-        min_step = 0.05
-        atol = Var.make_state(p=100., T=0.1, q_v=atol_q, q_l=atol_q, w=0.1, r=10., q_r=atol_q, z=10., q_i=atol_q)
+        rtol = 0.0
+        atol_q = 1.0e-3*1.0e-4
+        min_step = 0.01
+        T_tol = 0.01
+        atol = Var.make_state(p=100., T=T_tol, q_v=atol_q, q_l=atol_q, w=0.1, 
+                r=0.1, q_r=atol_q, z=10., q_i=atol_q, q_pr=atol_q)
 
-        solver = SolverClass(self.dFdz, rtol=rtol, atol=atol, min_step=min_step)
+        #solver = SolverClass(self.dFdz, rtol=rtol, atol=atol, min_step=min_step)
+        solver = integrators.NewSolver(dFdz=self.dFdz, rel_tol=rtol, abs_tol=atol, min_step=min_step)
+
         solver.set_initial_condition(initial_condition)
         self.fail_on_nan = fail_on_nan
 
