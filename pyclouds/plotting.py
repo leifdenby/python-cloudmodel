@@ -200,7 +200,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     z_ = np.linspace(0., profile.z.max(), 100)
                     mse_e = mse_env_f(z_)
                     profile_data = mse_c
-                    ref_plot_func = lambda: plot.plot(mse_e, z_, marker='', label='environment')
+                    ref_plot_func = lambda: plot.plot(mse_e/1000., z_, marker='', label='environment')
             elif v == 'Sw':
                 profile_data = None
             elif v == 'rho_c':
@@ -240,7 +240,11 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                 rh_e = profile.cloud_model.environment.rel_humidity(z)
                 qv_e = rh_e*qv_e__sat
 
-                profile_data = qv_c - qv_e
+                profile_data = (qv_c - qv_e)*1000
+
+            elif v == 'RH':
+                # handled further below
+                profile_data = None
 
             elif hasattr(profile, 'extra_vars') and v in profile.extra_vars:
                 profile_data = profile.extra_vars[v]
@@ -313,8 +317,11 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     label = str(profile)
 
                 if not profile_data is None:
-                    if v in "q_v q_l q_r q_i q_pr".split():
+                    if v in "q_v q_l q_r q_i q_pr d_rho".split():
                         profile_data = 1000.*np.array(profile_data)
+                    elif v in "lse d_lse mse d_mse".split():
+                        # J/kg => kJ/kg
+                        profile_data = np.array(profile_data)/1000.
 
                     profile_line = plot.plot(profile_data, z, label=label, marker='.', linestyle='',)
 
@@ -358,7 +365,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     ref_plot_func = lambda: plot.plot(qv_e*1000., z, marker='', label="environment")
                 elif v == 'd_qv':
                     plot.ylabel('height [m]')
-                    plot.xlabel(r'$\Delta$ water vapor specific concentration [g/kg]')
+                    plot.xlabel(r'$\Delta$ water vapor specific concentration [mg/kg]')
                     scale_by_max = True
                 elif v == 'Sw':
                     plot.ylabel('height [m]')
@@ -374,6 +381,24 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     Sw = (q_v/q_v__sat - 1.)*100.
                     plot.plot(Sw, z, marker='.', color=color, label='', linestyle='')
                     plot.xlim(-5, 5)
+                elif v == "RH":
+                    plot.ylabel('height [m]')
+                    plot.xlabel('relative humidity [%]')
+
+                    T = profile.F[:,Var.T]
+                    p = profile.F[:,Var.p]
+                    z = profile.z
+                    constants = profile.cloud_model.constants
+                    q_v__sat = parameterisations.ParametersationsWithSpecificConstants(constants=constants).pv_sat.qv_sat(T=T, p=p)
+                    q_v = profile.F[:,Var.q_v]
+                    color = lines[n_profile].get_color()
+                    RH = q_v/q_v__sat*100.
+                    plot.plot(RH, z, marker='.', color=color, label='', linestyle='')
+
+                    z_ = np.linspace(0., z.max(), 100)
+                    RH_e = 100*profile.cloud_model.environment.rel_humidity(z_)
+                    plot.plot(RH_e, z_, label='', marker='', color=color, linestyle='-')
+
                 elif v == 'q_l':
                     plot.ylabel('height [m]')
                     plot.xlabel('liquid water specific concentration [g/kg]')
@@ -388,16 +413,16 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     scale_by_max = True
                 elif v == 'd_lse':
                     plot.ylabel('height [m]')
-                    plot.xlabel('Liquid static energy difference to environment [kJ/m^3]')
+                    plot.xlabel('Liquid static energy difference to environment [kJ/kg]')
                 elif v == 'lse':
                     plot.ylabel('height [m]')
-                    plot.xlabel('Liquid static energy [kJ/m^3]')
+                    plot.xlabel('Liquid static energy [kJ/kg]')
                 elif v == 'd_mse':
                     plot.ylabel('height [m]')
-                    plot.xlabel('Moist static energy difference to environment [kJ/m^3]')
+                    plot.xlabel('Moist static energy difference to environment [kJ/kg]')
                 elif v == 'mse':
                     plot.ylabel('height [m]')
-                    plot.xlabel('Moist static energy [kJ/m^3]')
+                    plot.xlabel('Moist static energy [kJ/kg]')
                 elif v == 'r_c':
                     plot.ylabel(r'height [$m$]')
                     plot.xlabel('cloud-droplet radius [$\mu m$]')
@@ -409,7 +434,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     plot.xlabel('in-cloud density [kg/m3]')
                 elif v == 'd_rho':
                     plot.ylabel('height [m]')
-                    plot.xlabel('density difference to environment [kg/m^3]')
+                    plot.xlabel('density difference to environment [g/m^3]')
                 elif extra_var:
                     plot.ylabel('height [m]')
                     plot.xlabel('{} [?]'.format(v))
