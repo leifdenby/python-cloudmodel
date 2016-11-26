@@ -414,7 +414,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         self.beta = beta
         self.l_pr = l_pr
 
-    def _mu(self, r, w, B):
+    def _mu(self, r, w, B, z):
         return self.beta/r
 
     def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qr_c, qi_c):
@@ -675,7 +675,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         rho_c = self.cloud_mixture_density(p=p, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, qr_c=q_r)
         g = self.constants.g
         B = (rho_e - rho_c)/rho_e
-        mu = self._mu(r=r, w=w, B=B)
+        mu = self._mu(r=r, w=w, B=B, z=z)
 
 
         # initiate gradient
