@@ -151,6 +151,9 @@ class NewSolver:
                 #if self.debug:
                 print "Found nan, scaling down"
                 h *= 0.8
+
+                if h < self.min_step:
+                    raise Exception("Step became too small")
             else:
 
                 #if len( np.shape( r ) ) > 0:
