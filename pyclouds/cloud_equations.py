@@ -695,7 +695,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
             #dqd_dz__ent = mu/rho_c*(qd_e*rho_e - q_d*rho_c)
             dqd_dz__ent = mu*(qd_e - q_d)
             if dqd_dz__ent < 0.0:
-                print "WARNING: entrainment is moistening!"
+                warnings.warn("WARNING: entrainment is moistening!")
             #dFdz_entrain__q[Var.q_v] = -q_v*dqd_dz__ent
             #dFdz_entrain__q[Var.q_l] = -q_l*dqd_dz__ent
             #dFdz_entrain__q[Var.q_r] = -q_r*dqd_dz__ent
