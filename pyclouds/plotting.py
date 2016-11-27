@@ -328,7 +328,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     if n == 0:
                         lines += profile_line
 
-                    d_max = max(max(profile_data), d_max)
+                    d_max = np.nanmax(np.nanmax(profile_data), d_max)
 
                 plot.grid(True)
 
