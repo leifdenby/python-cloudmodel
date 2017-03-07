@@ -328,7 +328,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     if n == 0:
                         lines += profile_line
 
-                    d_max = np.nanmax(np.nanmax(profile_data), d_max)
+                    d_max = np.nanmax([np.nanmax(profile_data), d_max])
 
                 plot.grid(True)
 
@@ -454,7 +454,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
         if len(ref_lines) > 0:
             plot.legend(ref_lines, [l.get_label() for l in ref_lines])
 
-    plot.figlegend(lines, [l.get_label() for l in lines], loc = 'lower center', ncol=labels_ncol, labelspacing=0. )
+    plot.figlegend(lines, [l.get_label() for l in lines], loc = 'lower center', ncol=labels_ncol, labelspacing=0., numpoints=3)
     plot.grid(True)
 
     title = "Vertical cloud profiles"
