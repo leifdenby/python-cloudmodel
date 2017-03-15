@@ -57,18 +57,18 @@ def hydrometeor_profile_plot(F, z, Te, p_e):
     plot.plot(q_v, z, marker='x', label='in-cloud')
     plot.plot(q_v__sat, z, marker='x', label='saturation (in-cloud temp)')
     plot.ylabel('height [m]')
-    plot.xlabel('water vapor specific concentration [kg/kg]')
+    plot.xlabel('water vapor specific mass [kg/kg]')
     plot.legend()
     plot.grid(True)
     plot.subplot(132)
     plot.plot(q_l, z, marker='x', label='in-cloud')
     plot.ylabel('height [m]')
-    plot.xlabel('liquid water specific concentration [kg/kg]')
+    plot.xlabel('liquid water specific mass [kg/kg]')
     plot.grid(True)
     plot.subplot(133)
     plot.plot(q_r, z, marker='x', label='in-cloud')
     plot.ylabel('height [m]')
-    plot.xlabel('rain water specific concentration [kg/kg]')
+    plot.xlabel('rain water specific mass [kg/kg]')
     plot.grid(True)
 
 
@@ -346,7 +346,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     plot.xlabel('vertical velocity [m/s]')
                 elif v == 'q_v':
                     plot.ylabel('height [m]')
-                    plot.xlabel('water vapor specific concentration [g/kg]')
+                    plot.xlabel('water vapor specific mass [g/kg]')
                     scale_by_max = True
 
                     T = profile.F[:,Var.T]
@@ -365,7 +365,7 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
                     ref_plot_func = lambda: plot.plot(qv_e*1000., z, marker='', label="environment")
                 elif v == 'd_qv':
                     plot.ylabel('height [m]')
-                    plot.xlabel(r'$\Delta$ water vapor specific concentration [mg/kg]')
+                    plot.xlabel(r'$\Delta$ water vapor specific mass [mg/kg]')
                     scale_by_max = True
                 elif v == 'Sw':
                     plot.ylabel('height [m]')
@@ -401,11 +401,11 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
 
                 elif v == 'q_l':
                     plot.ylabel('height [m]')
-                    plot.xlabel('liquid water specific concentration [g/kg]')
+                    plot.xlabel('liquid water specific mass [g/kg]')
                     scale_by_max = True
                 elif v == 'q_r':
                     plot.ylabel('height [m]')
-                    plot.xlabel('rain water specific concentration [g/kg]')
+                    plot.xlabel('rain water specific mass [g/kg]')
                     scale_by_max = True
                 elif v == 'q_pr':
                     plot.ylabel('height [m]')
@@ -536,9 +536,9 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
             t_max = max(max(evolution.t), t_max)
 
             if v == 'q_l':
-                plot.ylabel('cloud water specific concentration [g/kg]')
+                plot.ylabel('cloud water specific mass [g/kg]')
             if v == 'q_v':
-                plot.ylabel('water vapour specific concentration [g/kg]')
+                plot.ylabel('water vapour specific mass [g/kg]')
 
                 T = evolution.F[:,Var.T]
                 p = evolution.F[:,Var.p]
@@ -562,7 +562,7 @@ def plot_hydrometeor_evolution(evolutions, variables=['q_v',], legend_loc='lower
             elif v == 'T':
                 plot.ylabel('Temperature [K]')
             elif v == 'q_r':
-                plot.ylabel('rain specific concentration [g/kg]')
+                plot.ylabel('rain specific mass [g/kg]')
             elif v == 'p':
                 plot.ylabel('pressure [Pa]')
 
