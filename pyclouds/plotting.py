@@ -457,6 +457,10 @@ def plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'q_l', 'T__tephigra
     plot.figlegend(lines, [l.get_label() for l in lines], loc = 'lower center', ncol=labels_ncol, labelspacing=0., numpoints=3)
     plot.grid(True)
 
+    # remove height labels for plots not in first coloumn
+    [fig.axes[n].set_ylabel('') for n in range(len(fig.axes)) if n % c != 0]
+    [fig.axes[n].yaxis.set_ticklabels([]) for n in range(len(fig.axes)) if n % c != 0]
+
     title = "Vertical cloud profiles"
     if initial_condition is not None:
         title += '\n' + Var.repr(initial_condition)
