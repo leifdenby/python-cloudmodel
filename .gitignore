@@ -3,3 +3,8 @@
 *.swp
 *.pyc
 pyclouds/tests/.cache
+
+build/
+dist/
+src/
+pyclouds.egg-info/

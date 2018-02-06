@@ -18,11 +18,11 @@ try:
 except ImportError:
     unified_microphysics = None
 
-# try:
-    # from ccfm.ccfmfortran import microphysics as ccfm_microphysics
-# except ImportError:
-    # # import pure python version instead
-from ccfm.ccfmpython import microphysics as ccfm_microphysics
+try:
+    from ccfm.ccfmfortran import microphysics as ccfm_microphysics
+except ImportError:
+    # import pure python version instead
+    from ccfm.ccfmpython import microphysics as ccfm_microphysics
 
 class HydrometeorEvolution:
     def __init__(self, F, t, model, integration_kwargs={}, extra_vars={}):

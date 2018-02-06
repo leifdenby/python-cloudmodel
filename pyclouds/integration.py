@@ -6,7 +6,6 @@ T_base, q_base, r_base, w_base = 300., 0.001, 100., 0.1
 z_base = 800.
 
 # ambient conditions
-T_ls, q_ls:q
 
 
 z_profile = np.linspace(0., 100., nz)
