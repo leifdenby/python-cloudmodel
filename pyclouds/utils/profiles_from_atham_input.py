@@ -44,9 +44,9 @@ F0_bubble = Var.make_state(T=T0, p=p0, q_v=qv0)
 z_clb, T_clb = cloud_initiation.compute_LCL(environment=environment, F0=F0_bubble)
 
 if debug:
-    print """Integrating with
+    print("""Integrating with
     z_clb, T_clb = {z_clb}m, {T_clb}T
-    """.format(z_clb=z_clb, T_clb=T_clb)
+    """.format(z_clb=z_clb, T_clb=T_clb))
 
 # setup cloud model
 model_name = args.model

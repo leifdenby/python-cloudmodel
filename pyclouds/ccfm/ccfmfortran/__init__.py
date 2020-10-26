@@ -1,1 +1,1 @@
-from fortranlib import *
+from .fortranlib import *

@@ -21,7 +21,3 @@ def moist_adjust(tem, q_v, prs):
         q_v  = q_v - cond
 
     return q_v
-
-
-def lua(:q
-        )

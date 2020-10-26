@@ -7,7 +7,7 @@ import odespy
 from scipy.constants import pi
 
 from pyclouds.cloud_equations import Var
-from common import AttrDict, default_constants, make_related_constants, ATHAM_constants
+from .common import AttrDict, default_constants, make_related_constants, ATHAM_constants
 from pyclouds.plotting import plot_hydrometeor_evolution
 from pyclouds import parameterisations
 
@@ -19,10 +19,10 @@ except ImportError:
     unified_microphysics = None
 
 try:
-    from ccfm.ccfmfortran import microphysics as ccfm_microphysics
+    from .ccfm.ccfmfortran import microphysics as ccfm_microphysics
 except ImportError:
     # import pure python version instead
-    from ccfm.ccfmpython import microphysics as ccfm_microphysics
+    from .ccfm.ccfmpython import microphysics as ccfm_microphysics
 
 class HydrometeorEvolution:
     def __init__(self, F, t, model, integration_kwargs={}, extra_vars={}):
@@ -38,7 +38,7 @@ class HydrometeorEvolution:
     def __str__(self):
         s = str(self.model)
         if len(self.integration_kwargs) > 0:
-            s += " (%s)" % ", ".join(["%s: %s" % (k, str(v)) for (k, v) in self.integration_kwargs.items()])
+            s += " (%s)" % ", ".join(["%s: %s" % (k, str(v)) for (k, v) in list(self.integration_kwargs.items())])
         return s
 
 class BaseMicrophysicsModel(object):
@@ -671,7 +671,7 @@ class ExplicitFortranModel:
                 F.append(state_mapping.um_pycloud(y=y))
                 t_.append(t[tn+1])
             except Exception as e:
-                print "(%s): Integration stopped, %s" % (str(self), str(e))
+                print("(%s): Integration stopped, %s" % (str(self), str(e)))
                 break
 
         return HydrometeorEvolution(F=np.array(F), t=np.array(t_), model=self,)
@@ -719,7 +719,7 @@ class OldATHAMKesslerFortran:
                 if F_new[Var.T] < 0.0:
                     raise ValueError("Temperature became negative")
             except Exception as e:
-                print "(%s): Integration stopped, %s" % (str(self), str(e))
+                print("(%s): Integration stopped, %s" % (str(self), str(e)))
                 raise
                 break
 

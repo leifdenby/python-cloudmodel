@@ -4,13 +4,13 @@ Collection of cloud-model equations.
 import odespy
 import warnings
 import numpy as np
-import plotting
+from . import plotting
 from scipy.constants import pi
 
-from common import AttrDict, Var, default_constants
-import cloud_microphysics
+from .common import AttrDict, Var, default_constants
+from . import cloud_microphysics
 
-import integrators
+from . import integrators
 
 class CloudProfile():
     def __init__(self, F, z, cloud_model, extra_vars={}):
@@ -48,20 +48,20 @@ class CloudModel(object):
         z_top = z[k]
 
         if F_top[Var.T] > 300.0:
-            print "Integration stopped: temperature got unphysically high"
+            print("Integration stopped: temperature got unphysically high")
             return True
         elif F_top[Var.w] < 0.0:
-            print "Integration stopped: vertical velocity dropped to zero"
-            print F_top[Var.w]
+            print("Integration stopped: vertical velocity dropped to zero")
+            print(F_top[Var.w])
             return True
         elif F_top[Var.r] > 10e3:
-            print "Integration stopped: cloud radius became unreasonably high (r>10km)"
+            print("Integration stopped: cloud radius became unreasonably high (r>10km)")
             return True
         elif z_top > 30e3:
-            print "Integration stopped: height reached too high (z > 30km)"
+            print("Integration stopped: height reached too high (z > 30km)")
             return True
         elif np.any(np.isnan(F_top)):
-            print "Integration stopped: solution became nan"
+            print("Integration stopped: solution became nan")
             if self.fail_on_nan:
                 raise Exception("Solution became nan")
             return True
@@ -76,19 +76,19 @@ class CloudModel(object):
         t_top = t[k]
 
         if F_top[Var.T] > 300.0:
-            print "Integration stopped: temperature got unphysically high"
+            print("Integration stopped: temperature got unphysically high")
             return True
         elif F_top[Var.T] < 0.0:
-            print "Integration stopped: temperature dropped below zero"
+            print("Integration stopped: temperature dropped below zero")
             return True
         elif F_top[Var.r] > 20e3:
-            print "Integration stopped: cloud radius became unreasonably high (r>20km)"
+            print("Integration stopped: cloud radius became unreasonably high (r>20km)")
             return True
         elif F_top[Var.z] < 0.0:
-            print "Integration stopped: height below ground"
+            print("Integration stopped: height below ground")
             return True
         elif F_top[Var.r] < 0.0:
-            print "Integration stopped: radius dropped below zero"
+            print("Integration stopped: radius dropped below zero")
             return True
         else:
             return False
@@ -114,8 +114,8 @@ class CloudModel(object):
         except Exception as e:
             # TODO: stop integration when exception is raised
             self.stop_integration = True
-            print "Error: %s" % e.message
-            print "Exception at t=%fs" % t
+            print("Error: %s" % e.message)
+            print("Exception at t=%fs" % t)
             dFdt = np.zeros((Var.NUM,))
 
         return dFdt
@@ -169,7 +169,7 @@ class CloudModel(object):
             F = F[:-1]
             z = z[:-1]
 
-            for k, v in mphys_extra_vars.items():
+            for k, v in list(mphys_extra_vars.items()):
                 try:
                     mphys_extra_vars[k] = v[:-1]
                 except IndexError:
@@ -891,7 +891,7 @@ class FixedRiseRateParcel(CloudModel):
         z_top = z[k]
 
         if z_top > 5000.0:
-            print "Integration stopped: max altitude reached"
+            print("Integration stopped: max altitude reached")
             return True
         else:
             return False

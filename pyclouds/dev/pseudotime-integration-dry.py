@@ -48,4 +48,4 @@ profiles.append(cloud_model.integrate_in_time(initial_condition, t))
 
 fig = plotting.plot_profiles(profiles, variables=['r', 'w', 'T', 'q_v', 'T__tephigram', ], initial_condition=initial_condition)
 fig.savefig(output_filename)
-print "output written to %s" % output_filename
+print("output written to %s" % output_filename)

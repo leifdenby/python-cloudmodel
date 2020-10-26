@@ -1,4 +1,4 @@
-from fortranlib import mo_ccfm_cloudbase
+from .fortranlib import mo_ccfm_cloudbase
 
 import numpy as np
 

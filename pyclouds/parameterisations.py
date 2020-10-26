@@ -1,5 +1,5 @@
-from common import AttrDict
-import common
+from .common import AttrDict
+from . import common
 
 import numpy as np
 import warnings
@@ -93,12 +93,12 @@ class SaturationVapourPressure(BaseParameterisation):
         }
 
         constants_label = ''
-        for k, v in constants_label_s.items():
+        for k, v in list(constants_label_s.items()):
             if self.constants == v:
                 constants_label = k + ": "
                 break
 
-        constants_label += ", ".join(["%s=%.03g" % (k, v) for (k, v) in self.constants.items()])
+        constants_label += ", ".join(["%s=%.03g" % (k, v) for (k, v) in list(self.constants.items())])
 
         return constants_label
 
@@ -134,7 +134,7 @@ class DynamicViscosity(BaseParameterisation):
 
     def __init__(self, implementation=Implementations.ROGERS_AND_YAU, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
-        assert implementation in DynamicViscosity.Implementations.__dict__.values()
+        assert implementation in list(DynamicViscosity.Implementations.__dict__.values())
 
         self.implementation = implementation
 
@@ -184,7 +184,7 @@ class ThermalConductivityCoefficient(BaseParameterisation):
 
     def __str__(self):
 
-        return "Linear model (%s)" % ", ".join(["%s=%.3g" % (k, v) for (k, v) in self.constants.items() ])
+        return "Linear model (%s)" % ", ".join(["%s=%.3g" % (k, v) for (k, v) in list(self.constants.items()) ])
 
 class WaterVapourDiffusionCoefficient(BaseParameterisation):
     ATHAM_constants = {
@@ -216,12 +216,12 @@ class WaterVapourDiffusionCoefficient(BaseParameterisation):
         }
 
         constants_label = ''
-        for k, v in constants_label_s.items():
+        for k, v in list(constants_label_s.items()):
             if self.constants == v:
                 constants_label = k + ": "
                 break
 
-        constants_label += ", ".join(["%s=%.03g" % (k, v) for (k, v) in self.constants.items()])
+        constants_label += ", ".join(["%s=%.03g" % (k, v) for (k, v) in list(self.constants.items())])
 
         return "power-law (%s)" % constants_label
 
@@ -230,7 +230,7 @@ class ParametersationsWithSpecificConstants:
         default_constants = parameterisation.default_constants
 
         new_constants = {}
-        for c_name in default_constants.keys():
+        for c_name in list(default_constants.keys()):
             try:
                 new_value = constants[subset][c_name]
             except KeyError:

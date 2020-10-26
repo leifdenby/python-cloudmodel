@@ -3,9 +3,9 @@ Contains a number of approaches for calculating the state a cloud-base which set
 the initial condition for cloud-profile integration.
 """
 
-from common import default_constants, Var
-from cloud_microphysics import MoistAdjustmentMicrophysics
-import parameterisations
+from .common import default_constants, Var
+from .cloud_microphysics import MoistAdjustmentMicrophysics
+from . import parameterisations
 
 class CloudbaseNotFoundException(Exception):
     pass

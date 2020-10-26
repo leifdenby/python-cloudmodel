@@ -31,9 +31,9 @@ q_d = 1.0 - q_v - q_l
 q_g = q_d + q_v
 Rv, Rd = constants.get('R_v'), constants.get('R_d')
 Rg = (Rd*q_d + Rv*q_v)/q_g
-print "q_v q_d q_g", q_v, q_d, q_g
-print 'pfak = Rg/(Rv * p)*q_g = ', Rg/(Rv*p0)*q_g
-print "qsat_v", parameterisations.pv_sat(T=T)*Rg/(Rv*p0)*q_g
+print("q_v q_d q_g", q_v, q_d, q_g)
+print('pfak = Rg/(Rv * p)*q_g = ', Rg/(Rv*p0)*q_g)
+print("qsat_v", parameterisations.pv_sat(T=T)*Rg/(Rv*p0)*q_g)
 
 solutions = []
 solutions.append(cloud_microphysics.OldATHAMKesslerFortran().integrate(initial_condition=initial_condition, t=t_, p0=p0))

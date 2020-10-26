@@ -42,14 +42,14 @@ class NewSolver:
                 return (X, T)
 
             if self.debug:
-                print
-                print "kk, t, h", kk, t, h
+                print()
+                print("kk, t, h", kk, t, h)
 
-                print "start"
+                print("start")
                 Var.print_formatted(x)
             else:
                 if int(t) % 100 == 0:
-                    print "{}...".format(int(t)),
+                    print("{}...".format(int(t)), end=' ')
                     sys.stdout.flush()
 
             if t + h > b:
@@ -62,7 +62,7 @@ class NewSolver:
                 dt_max = 0.8*np.min(np.abs(x[m]/dfdt_[m]))
 
                 if self.debug:
-                    print "did euler forward step", dt_max
+                    print("did euler forward step", dt_max)
 
                 x += dt_max*dfdt_
                 t += dt_max
@@ -113,23 +113,23 @@ class NewSolver:
             abs_err = np.abs(1./6.*(k4 - k5))
 
             if self.debug:
-                print "dfdz"
+                print("dfdz")
                 Var.print_formatted(k1/h)
 
                 #print "error rel:"
                 #Var.print_formatted(r/tol)
-                print "error abs:"
+                print("error abs:")
                 Var.print_formatted(abs_err)
 
-                print "sol1"
+                print("sol1")
                 #sol1 = x + c1 * k1 + c3 * k3 + c4 * k4 + c5 * k5
                 Var.print_formatted(x_n1)
                 
-                print "sol2"
+                print("sol2")
                 #sol2 =  -(r1 * k1 + r3 * k3 + r4 * k4 + r5 * k5 + r6 * k6 - sol1)
                 Var.print_formatted(x_n2)
 
-                print "diff"
+                print("diff")
                 Var.print_formatted(abs_err)
 
             abs_tol = self.abs_tol
@@ -149,7 +149,7 @@ class NewSolver:
 
             if np.any(np.isnan(k5)) or np.any(np.isnan(k4)):
                 #if self.debug:
-                print "Found nan, scaling down"
+                print("Found nan, scaling down")
                 h *= 0.8
 
                 if h < self.min_step:

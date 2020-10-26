@@ -42,7 +42,7 @@ def test_derivatives(py_ver, f_ver):
         # make a random state
         F = np.random.random((n_vars,))
 
-        res_py = py_func(**dict(zip(py_args, F)))
-        res_f = f_func(**dict(zip(f_args, F)))
+        res_py = py_func(**dict(list(zip(py_args, F))))
+        res_f = f_func(**dict(list(zip(f_args, F))))
 
         assert res_py == res_f

@@ -38,7 +38,7 @@ plot.figure(figsize=(10,20))
 plot_grids = iter(GridSpec(3,1))
 
 
-plot.subplot(plot_grids.next())
+plot.subplot(next(plot_grids))
 
 mu__rogers_and_yau = parameterisations.DynamicViscosity(implementation=parameterisations.DynamicViscosity.Implementations.ROGERS_AND_YAU)
 mu__thompson = parameterisations.DynamicViscosity(implementation=parameterisations.DynamicViscosity.Implementations.G_THOMPSON)
@@ -53,7 +53,7 @@ plot.grid(True)
 plot.title("Dynamic viscosity of air")
 
 
-plot.subplot(plot_grids.next())
+plot.subplot(next(plot_grids))
 
 Ka = parameterisations.Ka
 plot.plot(T_c, Ka(T_c+273.15), label=str(Ka), marker='', linestyle=':')
@@ -65,7 +65,7 @@ plot.grid(True)
 plot.title("Thermal conductivity of air")
 
 
-plot.subplot(plot_grids.next())
+plot.subplot(next(plot_grids))
 
 Dv_ATHAM_constants = parameterisations.WaterVapourDiffusionCoefficient.ATHAM_constants
 Dv_ATHAM = parameterisations.WaterVapourDiffusionCoefficient(constants=Dv_ATHAM_constants)
