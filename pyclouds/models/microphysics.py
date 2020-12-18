@@ -13,6 +13,7 @@ from ..reference.constants import (
 )
 from ..reference import parameterisations
 from ..integration import methods as integration_methods
+from ..plots import parcel as parcel_plots
 
 try:
     import unified_microphysics.fortran as unified_microphysics
@@ -37,7 +38,7 @@ class HydrometeorEvolution:
         self.extra_vars = extra_vars
 
     def plot(self):
-        plot_hydrometeor_evolution(
+        parcel_plots.plot_hydrometeor_evolution(
             [self,]
         )
 

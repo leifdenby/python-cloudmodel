@@ -1,8 +1,10 @@
 import numpy as np
+import warnings
 
 
 from ... import Var
 from .. import methods as integration_methods
+from ...plots import parcel as parcel_plots
 
 
 class ParcelEvolution:
@@ -13,7 +15,7 @@ class ParcelEvolution:
         self.extra_vars = extra_vars
 
     def plot(self, variables=("r", "w", "T")):
-        return plotting.plot_profiles([self,], variables=variables)
+        return parcel_plots.plot_profiles([self,], variables=variables)
 
     def __str__(self):
         return str(self.cloud_model)
@@ -180,4 +182,4 @@ class ParcelModelIntegrator(object):
 
         F, t = solver.solve(t, stopping_criterion)
 
-        return CloudProfile(F=F, z=F[:, Var.z], cloud_model=self)
+        return ParcelEvolution(F=F, z=F[:, Var.z], cloud_model=self)
