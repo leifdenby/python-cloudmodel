@@ -3,7 +3,6 @@ Collection of microphysics routines for use with cloud-model integration.
 """
 import warnings
 import numpy as np
-import odespy
 from scipy.constants import pi
 
 from pyclouds.cloud_equations import Var
@@ -58,7 +57,7 @@ class BaseMicrophysicsModel(object):
     def _stopping_criterion(self, F_solution, t, k):
         return False
 
-    def integrate(self, initial_condition, t, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
+    def integrate(self, initial_condition, t, SolverClass, stopping_criterion=None, tolerance=1e-3):
         # When integrating the microphysics on it's own we assume constant
         # pressure which must be provided when integrating
         self.extra_vars = {}
@@ -638,7 +637,7 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
         return dFdz
 
     def __str__(self):
-        return "Fortran 'no_ice' model (%s) with odespy integrator" % self.model_constraint
+        return "Fortran 'no_ice' model (%s)" % self.model_constraint
 
 class ExplicitFortranModel:
     """
@@ -657,7 +656,7 @@ class ExplicitFortranModel:
         self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
-    def integrate(self, initial_condition, t, SolverClass=odespy.RKFehlberg, stopping_criterion=None, tolerance=1e-3):
+    def integrate(self, initial_condition, t, SolverClass, stopping_criterion=None, tolerance=1e-3):
         state_mapping = PyCloudsUnifiedMicrophysicsStateMapping()
 
         y = state_mapping.pycloud_um(initial_condition)
