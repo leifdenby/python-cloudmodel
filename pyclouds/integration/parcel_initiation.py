@@ -3,12 +3,15 @@ Contains a number of approaches for calculating the state a cloud-base which set
 the initial condition for cloud-profile integration.
 """
 
-from .common import default_constants, Var
-from .cloud_microphysics import MoistAdjustmentMicrophysics
-from . import parameterisations
+from .. import Var
+from ..reference.constants import default_constants
+from ..models.microphysics import MoistAdjustmentMicrophysics
+from ..reference import parameterisations
+
 
 class CloudbaseNotFoundException(Exception):
     pass
+
 
 def compute_LCL(environment, F0):
     """
@@ -16,11 +19,11 @@ def compute_LCL(environment, F0):
     will condense given an environmental profile and ground-base conditions for the parcel.
     """
     # load constants
-    cp_d = default_constants.get('cp_d')
-    cp_v = default_constants.get('cp_v')
-    R_d = default_constants.get('R_d')
-    R_v = default_constants.get('R_v')
-    g = default_constants.get('g')
+    cp_d = default_constants.get("cp_d")
+    cp_v = default_constants.get("cp_v")
+    R_d = default_constants.get("R_d")
+    R_v = default_constants.get("R_v")
+    g = default_constants.get("g")
 
     qv = F0[Var.q_v]
     ql = F0[Var.q_l]
@@ -29,8 +32,8 @@ def compute_LCL(environment, F0):
     assert ql == 0.0 and qr == 0.0 and qi == 0.0
     qd = 1.0 - qv
 
-    cp_g = qd*cp_d + qv*cp_v
-    R_g = qd*R_d + qv*R_v
+    cp_g = qd * cp_d + qv * cp_v
+    R_g = qd * R_d + qv * R_v
     T = F0[Var.T]
 
     # XXX: fixed integration step for now
@@ -40,7 +43,7 @@ def compute_LCL(environment, F0):
         p = environment.p(z)
         qv_sat = parameterisations.pv_sat.qv_sat(T=T, p=p)
 
-        Sw = qv/qv_sat
+        Sw = qv / qv_sat
 
         if Sw > 1.0:
             return z, T
@@ -48,10 +51,10 @@ def compute_LCL(environment, F0):
             raise CloudbaseNotFoundException
 
         # temperature decreases at at dry adiabatic lapse rate
-        dTdz = -g/cp_g
+        dTdz = -g / cp_g
 
         z += dz
-        T += dz*dTdz
+        T += dz * dTdz
 
     raise CloudbaseNotFoundException
 
@@ -99,24 +102,24 @@ def original_CCFM_cloudbase(environment, dqv=0.0, dT=0.0):
 
     basebuo = 0.5  # taken from `cloudbase.f90`
 
-    cp_d = default_constants.get('cp_d')
-    R_d = default_constants.get('R_d')
-    R_v = default_constants.get('R_v')
-    g = default_constants.get('g')
+    cp_d = default_constants.get("cp_d")
+    R_d = default_constants.get("R_d")
+    R_v = default_constants.get("R_v")
+    g = default_constants.get("g")
 
-    epsi = R_d/R_v
+    epsi = R_d / R_v
 
     condensed = False
 
-    dz = 10.
-    z = 0.
+    dz = 10.0
+    z = 0.0
     T_c = environment.temp(z) + dT
     qv_c = environment.q_v(z) + dqv
 
     # we don't expect a cloud-base above 4km
     while z < 4e3:
         z += dz
-        T_c += -g/cp_d*dz
+        T_c += -g / cp_d * dz
         p_c = environment.p(z)
 
         T_e = environment.temp(z)
@@ -125,17 +128,16 @@ def original_CCFM_cloudbase(environment, dqv=0.0, dT=0.0):
         F = Var.make_state(T=T_c, p=p_c, q_v=qv_c)
         F_new = mphys._calc_adjusted_state(F, iterations=5)
 
-        if (F_new[Var.q_v] < F[Var.q_v]):
+        if F_new[Var.q_v] < F[Var.q_v]:
             condensed = True
             T_c = F_new[Var.T]
 
-        buo = T_c*(1. + epsi*qv_c) - T_e*(1. + epsi*qv_e)
+        buo = T_c * (1.0 + epsi * qv_c) - T_e * (1.0 + epsi * qv_e)
 
-        if (condensed and buo >= -basebuo):
+        if condensed and buo >= -basebuo:
             return z, T_c, qv_c
 
-        if (condensed and buo <= -(basebuo + 0.2)):
+        if condensed and buo <= -(basebuo + 0.2):
             break
 
     raise CloudbaseNotFoundException
-

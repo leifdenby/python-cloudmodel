@@ -5,6 +5,7 @@ class Var:
     """
     Representation of a state vector at a specific altitude
     """
+
     r = 0
     w = 1
     T = 2
@@ -16,18 +17,33 @@ class Var:
     p = 8
     q_pr = 9  # TODO: should this really be a m_precip/m_total?
 
-    names = ['r', 'w', 'T', 'q_v', 'q_r', 'q_l', 'q_i', 'z', 'p', 'q_pr']
+    names = ["r", "w", "T", "q_v", "q_r", "q_l", "q_i", "z", "p", "q_pr"]
     NUM = len(names)
 
     @staticmethod
-    def print_formatted(v, formatting='%g'):
-        print(",\t".join([("%s=" + formatting) % (Var.names[i], v[i]) for i in range(Var.NUM)]))
+    def print_formatted(v, formatting="%g"):
+        print(
+            ",\t".join(
+                [("%s=" + formatting) % (Var.names[i], v[i]) for i in range(Var.NUM)]
+            )
+        )
 
     @staticmethod
-    def repr(v, formatting='%g', skip=[]):
-        units = { 'w': 'm/s', 'r': 'm', 'T': 'K', 'z': 'm', 'p': 'Pa',
-                }
-        return ", ".join([r"$%s=%g%s$" % (Var.names[i], v[i], units.get(Var.names[i], '')) for i in range(Var.NUM) if not Var.names[i] in skip])
+    def repr(v, formatting="%g", skip=[]):
+        units = {
+            "w": "m/s",
+            "r": "m",
+            "T": "K",
+            "z": "m",
+            "p": "Pa",
+        }
+        return ", ".join(
+            [
+                r"$%s=%g%s$" % (Var.names[i], v[i], units.get(Var.names[i], ""))
+                for i in range(Var.NUM)
+                if not Var.names[i] in skip
+            ]
+        )
 
     @staticmethod
     def make_state(**kwargs):
