@@ -204,6 +204,7 @@ class NoMicrophysicsNoEntrainment(CloudModel):
         mu = self.mu
         Lv = self.Lv
         R_d = self.constants.R_d
+        cp_d = self.constants.cp_d
 
         qsat_w = self.microphysics.parameterisations.pv_sat.qv_sat(T=T, p=p)
         return (-g/cp_d*(1+(Lv * qsat_w)/(R_d*T)) - mu*(Te-T))
