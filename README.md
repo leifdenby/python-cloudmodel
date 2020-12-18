@@ -15,7 +15,7 @@ Runge-Kutta-Fehlberg is used due to its adaptive error-correcting timestepping.
 
 An example of an integrated cloud of a given radius follows below:
 
-![Cloud vertical radius, temperature and vertical velocity](cloud_profile.png)
+![Cloud vertical radius, temperature and vertical velocity](doc/cloud_profile.png)
 
 ![Cloud vertical profile of specific concentration of water vapor, liquid water
-and rain water](cloud_hydrometeors.png)
+and rain water](doc/cloud_hydrometeors.png)
