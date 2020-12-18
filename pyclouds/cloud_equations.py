@@ -180,42 +180,49 @@ class CloudModel(object):
         return CloudProfile(F=F, z=z, cloud_model=self, extra_vars=mphys_extra_vars)
 
 
-class NoMicrophysicsNoEntrainment:
+class NoMicrophysicsNoEntrainment(CloudModel):
     mu = 0.0  # entrainment rate [1/m]
     gamma = 0.5  # virtual mass coefficient [1]
     D = 0.0  # drag coefficient [1]
     Lv = 2.5008e6  # latent heat of vapourisation [J/kg]
 
-    def dwdz(z, r, w, T):
+    def dwdz(self, z, r, w, T, Te):
         """
         Also requires: environment temperature (density), so that buoyancy can be computed
         """
+        g = self.constants.g
+        gamma = self.gamma
+        mu = self.mu
+        D = self.D
 
-        B = (T-Te(z))/T
+        B = (T-Te)/T
 
         return 1./w*(g/(1+gamma)*B - mu*w**2 - D*w**2/r)
 
-    def dTdz(z, r, w, T):
-        Te_ = Te(z)
-        p_ = p(z)
+    def dTdz(self, z, r, w, T, Te, p):
+        g = self.constants.g
+        mu = self.mu
 
-        qsat_w = saturation_calculation.qv_sat(T=T, p=p_)
+        qsat_w = saturation_calculation.qv_sat(T=T, p=p)
 
-        return (-g/cp_d*(1+(Lv * qsat_w)/(R_d*T)) - mu*(Te_-T))
+        return (-g/cp_d*(1+(Lv * qsat_w)/(R_d*T)) - mu*(Te-T))
 
-    def drdz(z, r, w, T, dwdz_, dTdz_):
-        #dwdz_ = dwdz(z, r, w, T)
-        #dTdz_ = dTdz(z, r, w, T)
+    def drdz(self, z, r, w, T, dwdz_, dTdz_):
+        # dwdz_ = dwdz(z, r, w, T)
+        # dTdz_ = dTdz(z, r, w, T)
+        g = self.constants.g
+        R_d = self.constants.R_d
+        mu = self.mu
 
         return 2./r *( (g/(R_d*T) + 1./T*dTdz_) - 1./w * dwdz_ + mu/r)
 
-    def dFdz(F, z):
+    def dFdz(self, F, z):
         r = F[Var.r]
         w = F[Var.w]
         T = F[Var.T]
 
-        dwdz_ = dwdz(z, r, w, T)
-        dTdz_ = dTdz(z, r, w, T)
+        dwdz_ = dwdz(z, r, w, T, Te)
+        dTdz_ = dTdz(z, r, w, T, Te)
         drdz_ = drdz(z, r, w, T, dwdz_, dTdz_)
 
         return [drdz_, dwdz_, dTdz_, 0., 0., 0., 0.,]
@@ -260,7 +267,7 @@ class Wagner2009(CloudModel):
         qv__s = q_v
 
         dQ = self.microphysics(T=T_s, p=p_e, qv=qv__s)
-        dq_v = dQ[VarQ.q_v]
+        dq_v = dQ[Var.q_v]
 
         dTdz__latent_heat = -self.Lv/cp_d*dq_v
 
@@ -279,7 +286,7 @@ class Wagner2009(CloudModel):
         T = F[Var.T]
         q_v = F[Var.q_v]
 
-        dwdz_ = self.dwdz(z, r, w, T)
+        dwdz_ = self.self.dwdz(z, r, w, T)
         dTdz_, dQdz_ = self.dTdz__dQdz(z, r, w, T, q_v)
         drdz_ = self.drdz(z, r, w, T, dwdz_, dTdz_)
 
@@ -346,38 +353,6 @@ class DryAirOnly(CloudModel):
 
     def __str__(self):
         return r"DryAirEqns ($D=%g$, $\beta=%g$)" % (self.D, self.beta,)
-
-class CCFM_v0(CloudModel):
-    def dFdz(self, F, z):
-        #import ccfm.version0
-
-        raise NotImplemented
-
-        r = F[Var.r]
-        w = F[Var.w]
-        T = F[Var.T]
-        q_v = F[Var.q_v]
-        q_r = F[Var.q_r]
-        q_l = F[Var.q_l]
-        q_i = F[Var.q_i]
-
-        p_e = self.p_e(z)
-
-        warnings.warn("Environment assumed dry")
-        T_e = self.T_e(z)
-        qv_e = 0.0
-        Tv_e = T_e*(1. + 0.61*qv_e)
-
-        Tv_e = self.T_e(z)*(1. + 0.61*q_v)
-
-        dwdz_ = ccfm.version0.ddv_z(vz_=w, q_l=q_l, q_r=q_r, q_i=q_i, q_s=0.0, t_ve=Tv_e, t_vc=Tv_c)
-        dTdz_ = ccfm.version0.ddt_z(q_satw=q_satw, t_c=T, mu=mu, t_e=T_e, qv_e=qv_e, p_e=p_e, dpdz=dpdz)
-
-        dpdz = 0.0
-        warnings.warn("Should dpdz be zero?")
-        drdz_ = ccfm.version0.ddr_z(ddt_z=dTdz_,ddv_z=dwdz_,t_ve=Tv_e,t_vc=Tv_c,rad=r,v_z=w)
-
-        return [drdz_, dwdz_, dTdz_, 0., 0., 0., 0.,]
 
 class FullThermodynamicsCloudEquations(CloudModel):
     """

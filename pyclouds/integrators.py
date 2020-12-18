@@ -1,6 +1,8 @@
 import sys
 import numpy as np
 
+from .common import Var
+
 class NewSolver:
     def __init__(self, dFdz, abs_tol, rel_tol, min_step):
         self.dFdz = dFdz
