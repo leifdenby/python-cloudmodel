@@ -1,4 +1,4 @@
-
+import numpy as np
 
 # r, w, T, q_v, q_r, q_l, q_i
 class Var:
