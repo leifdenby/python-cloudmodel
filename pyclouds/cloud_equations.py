@@ -202,9 +202,10 @@ class NoMicrophysicsNoEntrainment(CloudModel):
     def dTdz(self, z, r, w, T, Te, p):
         g = self.constants.g
         mu = self.mu
+        Lv = self.Lv
+        R_d = self.constants.R_d
 
-        qsat_w = saturation_calculation.qv_sat(T=T, p=p)
-
+        qsat_w = self.microphysics.parameterisations.pv_sat.qv_sat(T=T, p=p)
         return (-g/cp_d*(1+(Lv * qsat_w)/(R_d*T)) - mu*(Te-T))
 
     def drdz(self, z, r, w, T, dwdz_, dTdz_):
@@ -221,9 +222,11 @@ class NoMicrophysicsNoEntrainment(CloudModel):
         w = F[Var.w]
         T = F[Var.T]
 
-        dwdz_ = dwdz(z, r, w, T, Te)
-        dTdz_ = dTdz(z, r, w, T, Te)
-        drdz_ = drdz(z, r, w, T, dwdz_, dTdz_)
+        Te = self.environment.temp(z)
+
+        dwdz_ = self.dwdz(z, r, w, T, Te)
+        dTdz_ = self.dTdz(z, r, w, T, Te)
+        drdz_ = self.drdz(z, r, w, T, dwdz_, dTdz_)
 
         return [drdz_, dwdz_, dTdz_, 0., 0., 0., 0.,]
 
@@ -516,6 +519,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
         elif self.entrain_liquid_static_energy:
             # XXX: This is *actually* liquid static energy
             # heat capacity of mixture with all moisture in the vapour phase
+            qr_c = 0.0  # TODO: is this reasonable?
             c_cm_p = cp_d*qd_c + cp_v*(qv_c + ql_c + qr_c + qi_c)
 
             qd_e = 1.0 - qv_e
