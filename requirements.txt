@@ -1,1 +1,2 @@
 numpy
+-e git://github.com/rajeshrinet/odespy.git#egg=odespy
