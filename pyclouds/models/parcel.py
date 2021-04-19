@@ -918,16 +918,6 @@ class FixedRiseRateParcel(CloudModel):
         self.w0 = w0
         self.beta = beta
 
-    def _stopping_criterion(self, F_solution, z, k):
-        F_top = F_solution[k]
-        z_top = z[k]
-
-        if z_top > 5000.0:
-            print("Integration stopped: max altitude reached")
-            return True
-        else:
-            return False
-
     def cloud_mixture_density(self, p, T_c, qd_c, qv_c, ql_c, qr_c, qi_c):
         """
         Compute the mixture density from the import full equation of state
@@ -1027,9 +1017,6 @@ class FixedRiseRateParcel(CloudModel):
         q_d = 1.0 - q_v - q_l - q_i - q_r
 
         # cloud is assumed to be at same pressure as in environment
-        p = self.environment.p(z)
-
-        rho_e = self.environment.rho(z)
         T_e = self.environment.temp(z)
 
         dFdz_ = np.zeros((Var.NUM,))

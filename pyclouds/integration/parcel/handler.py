@@ -5,14 +5,18 @@ import warnings
 from ... import Var
 from .. import methods as integration_methods
 from ...plots import parcel as parcel_plots
+from .stopping import DEFAULT_STOPPING_FUNCTIONS
 
 
 class ParcelEvolution:
-    def __init__(self, F, z, cloud_model, extra_vars={}):
+    def __init__(
+        self, F, z, cloud_model, extra_vars={}, integration_stopping_reason=None
+    ):
         self.F = F
         self.z = z
         self.cloud_model = cloud_model
         self.extra_vars = extra_vars
+        self.integration_stopping_reason = integration_stopping_reason
 
     def plot(self, variables=("r", "w", "T")):
         return parcel_plots.plot_profiles(
@@ -39,6 +43,7 @@ class ParcelModelIntegrator(object):
         stopping_criterion=None,
         tolerance=1e-3,
         fail_on_nan=False,
+        method="RK45",
     ):
         self._validate_initial_state(initial_condition)
 
@@ -57,87 +62,21 @@ class ParcelModelIntegrator(object):
             q_pr=atol_q,
         )
 
-        # solver = integration_methods.NewSolver(
-        #     dFdz=self.cloud_model.dFdz, rtol=rtol, atol=atol, min_step=min_step
-        # )
-
-        # solver.set_initial_condition(initial_condition)
-        # self.fail_on_nan = fail_on_nan
-
-        # # TODO: work out how to extent state-vector to include microphysics variables
-        # # mphys_extra_vars = {}
-        # # self.microphysics.extra_vars = mphys_extra_vars
-
-        # if stopping_criterion is None:
-        #     stopping_criterion = self._stopping_criterion
-        # F, z = solver.solve(z, stopping_criterion,)
-
-        # if self._stopping_criterion(F_solution=F, z=z, k=len(z)-1):
-        # F = F[:-1]
-        # z = z[:-1]
-
-        # for k, v in list(mphys_extra_vars.items()):
-        # try:
-        # mphys_extra_vars[k] = v[:-1]
-        # except IndexError:
-        # pass
-
-        # mphys_extra_vars.update(self.extra_vars)
         rtol = 0.0
         solver = integration_methods.ScipyIntegrator(
-            dFdz=self.cloud_model.dFdz, atol=atol, rtol=rtol
+            dFdz=self.cloud_model.dFdz,
+            atol=atol,
+            rtol=rtol,
+            stopping_functions=DEFAULT_STOPPING_FUNCTIONS,
+            method=method,
         )
-        F, z = solver.solve(z=z, F0=initial_condition)
+        F, z, stopping_reason = solver.solve(z=z, F0=initial_condition)
 
-        return ParcelEvolution(F=F, z=z, cloud_model=self)
-
-    def _stopping_criterion(self, z, F):
-        if F[Var.T] > 300.0:
-            print("Integration stopped: temperature got unphysically high")
-            return True
-        elif F[Var.w] < 0.0:
-            print("Integration stopped: vertical velocity dropped to zero")
-            print(F[Var.w])
-            return True
-        elif F[Var.r] > 10e3:
-            print("Integration stopped: cloud radius became unreasonably high (r>10km)")
-            return True
-        elif z > 30e3:
-            print("Integration stopped: height reached too high (z > 30km)")
-            return True
-        elif np.any(np.isnan(F)):
-            print("Integration stopped: solution became nan")
-            if self.fail_on_nan:
-                raise Exception("Solution became nan")
-            return True
-        else:
-            return False
-
-    def _stopping_criterion_time(self, z, F):
-        if hasattr(self, "stop_integration"):
-            return True
-
-        if F[Var.T] > 300.0:
-            print("Integration stopped: temperature got unphysically high")
-            return True
-        elif F[Var.T] < 0.0:
-            print("Integration stopped: temperature dropped below zero")
-            return True
-        elif F[Var.r] > 20e3:
-            print("Integration stopped: cloud radius became unreasonably high (r>20km)")
-            return True
-        elif F[Var.z] < 0.0:
-            print("Integration stopped: height below ground")
-            return True
-        elif F[Var.r] < 0.0:
-            print("Integration stopped: radius dropped below zero")
-            return True
-        else:
-            return False
+        return ParcelEvolution(
+            F=F, z=z, cloud_model=self, integration_stopping_reason=stopping_reason
+        )
 
     def dFdt(self, F, t):
-        # print "--> ",
-        # Var.print_formatted(F)
         w = F[Var.w]
         z = F[Var.z]
 
@@ -147,12 +86,6 @@ class ParcelModelIntegrator(object):
             dFdt = dFdz * dzdt
             dFdt[Var.z] = dzdt
 
-            # print "dFdz",
-            # Var.print_formatted(dFdz)
-
-            # print "dFdt=",
-            # Var.print_formatted(dFdt)
-            # print
         except Exception as e:
             # TODO: stop integration when exception is raised
             self.stop_integration = True

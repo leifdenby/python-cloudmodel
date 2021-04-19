@@ -7,11 +7,10 @@ cloud-models, with particular emphasis on improving the cloud model in CCFM
 
 Each model is based around a set of conservation equations describing the
 vertical change in in-cloud variables in a convective cloud in the mature state.
-Once specified each cloud-model can then be integrated, which is done using one of
-the ODE solvers in [odespy](https://github.com/hplgit/odespy). Using `odespy`
-allows for simple intercomparison of [different numerical
-integrators](http://hplgit.github.io/odespy/doc/pub/tutorial/html/main_odespy.html#methods-and-implementations-offered-by-odespy), by default
-Runge-Kutta-Fehlberg is used due to its adaptive error-correcting timestepping.
+Once specified each cloud-model can then be integrated, which is done
+using one of [scipy's ODE integrators](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#scipy.integrate.solve_ivp)
+for initial value problems. By default Runge-Kutta-Fehlberg is used due to
+its adaptive error-correcting timestepping.
 
 An example of an integrated cloud of a given radius follows below:
 

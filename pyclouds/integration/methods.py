@@ -6,23 +6,53 @@ from .. import Var
 
 
 class ScipyIntegrator:
-    def __init__(self, dFdz, atol, rtol):
+    """
+    Wrapper for calling scipy's ODE integration so that we can pass in stopping
+    criteria and check the output easily
+    """
+
+    def __init__(self, dFdz, atol, rtol, method="RK45", stopping_functions=[]):
         self.dFdz = dFdz
         self.atol = atol
         self.rtol = rtol
         self.debug = False
+        [setattr(fn, "terminal", True) for fn in stopping_functions]
+        self.stopping_functions = stopping_functions
+        self.method = method
 
     def solve(self, z, F0):
         res = solve_ivp(
-            self.dFdz,
+            fun=self.dFdz,
+            method=self.method,
             t_span=[z.min(), z.max()],
             y0=F0,
             atol=self.atol,
+            events=self.stopping_functions,
         )
 
         F, z = res.y, res.t
 
-        return F, z
+        if res.status == 0:
+            return F, z, None
+        elif res.status == 1:
+            # a stopping criterion stopped the integration, find out which one(s)
+            function_names = [fn.__name__ for fn in self.stopping_functions]
+            triggered_fns = {}
+            for i, z_triggers in enumerate(res.t_events):
+                if len(z_triggers) == 0:
+                    pass
+                elif len(z_triggers) == 1:
+                    triggered_fns[function_names[i]] = z_triggers[0]
+                else:
+                    raise NotImplementedError(len(z_triggers))
+
+            stopping_reason = ", ".join(
+                [f"{k} triggered at {v}" for (k, v) in triggered_fns.items()]
+            )
+
+            return F, z, stopping_reason
+        else:
+            raise Exception
 
 
 class NewSolver:
