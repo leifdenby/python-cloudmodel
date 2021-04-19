@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plot
 from scipy import optimize
 
-from pyclouds import parameterisations
-from pyclouds import common
+from ..reference import parameterisations
+from .. import Var
+from ..reference import constants
 
 savefig = False
 
@@ -15,13 +16,13 @@ if savefig:
 T_c = np.linspace(-30.0, 20.0, 50)
 
 pv_sat__atham = parameterisations.ParametersationsWithSpecificConstants(
-    common.ATHAM_constants
+    constants.ATHAM_constants
 ).pv_sat
 pv_sat__ccfm = parameterisations.ParametersationsWithSpecificConstants(
-    common.CCFM_constants
+    constants.CCFM_constants
 ).pv_sat
 pv_sat__default = parameterisations.ParametersationsWithSpecificConstants(
-    common.default_constants
+    constants.default_constants
 ).pv_sat
 
 plot.figure(**plot_kwargs)

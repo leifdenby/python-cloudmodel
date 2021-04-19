@@ -3,7 +3,7 @@ import matplotlib.pyplot as plot
 from matplotlib.gridspec import GridSpec
 from scipy import optimize
 
-from pyclouds import parameterisations
+from ..reference import parameterisations
 
 plot.ion()
 

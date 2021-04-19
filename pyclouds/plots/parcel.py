@@ -9,8 +9,8 @@ try:
 except ImportError:
     Tephigram = None
 
-from . import parameterisations
-from .common import Var
+from ..reference import parameterisations
+from .. import Var
 
 
 def profile_plot(F, z, Te):
