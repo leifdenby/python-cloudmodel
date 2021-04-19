@@ -27,14 +27,14 @@ def test__drag():
     )
 
     cloud_model = parcel_models.DryAirOnly(
-        environment=environment, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics
+        environment=environment, gamma=0.0, C_D=0.0, beta=0.0, microphysics=microphysics
     )
     profile_no_drag = cloud_model.integrate(
         initial_condition=initial_condition, z=z_points
     )
 
     cloud_model = parcel_models.DryAirOnly(
-        environment=environment, gamma=0.0, D=1.0, beta=0.0, microphysics=microphysics
+        environment=environment, gamma=0.0, C_D=1.0, beta=0.0, microphysics=microphysics
     )
     profile_with_drag = cloud_model.integrate(
         initial_condition=initial_condition, z=z_points
@@ -64,12 +64,12 @@ def test__entrainment():
     )
 
     cloud_model = CloudModel(
-        environment=environment, gamma=0.0, D=0.0, beta=0.0, microphysics=microphysics
+        environment=environment, gamma=0.0, C_D=0.0, beta=0.0, microphysics=microphysics
     )
     profile_no_entrainment = cloud_model.integrate(initial_condition, z_points)
 
     cloud_model = CloudModel(
-        environment=environment, gamma=0.0, D=0.0, beta=0.2, microphysics=microphysics
+        environment=environment, gamma=0.0, C_D=0.0, beta=0.2, microphysics=microphysics
     )
     profile_with_entrainment = cloud_model.integrate(initial_condition, z_points)
 

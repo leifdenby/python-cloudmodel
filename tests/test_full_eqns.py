@@ -116,7 +116,7 @@ def test__entrainment():
         environment=environment, gamma=0.0, C_D=0.0, beta=0.2, microphysics=microphysics
     )
     cloud_model_dry = parcel_models.DryAirOnly(
-        environment=environment, gamma=0.0, D=0.0, beta=0.2, microphysics=microphysics
+        environment=environment, gamma=0.0, C_D=0.0, beta=0.2, microphysics=microphysics
     )
 
     dFdz1 = cloud_model_no_entrainment.dFdz(z=0.0, F=initial_condition)

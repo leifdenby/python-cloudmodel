@@ -65,7 +65,7 @@ class NewSolver:
             kk += 1
             # Adjust step size when we get to last interval
 
-            if stopping_func(X, T, len(T) - 1):
+            if self.stopping_func(X, T, len(T) - 1):
                 return (X, T)
 
             if self.debug:
