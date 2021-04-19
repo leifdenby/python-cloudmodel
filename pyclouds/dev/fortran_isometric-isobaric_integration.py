@@ -49,7 +49,14 @@ solutions.append(
 
 plot.ioff()
 plot_hydrometeor_evolution(
-    solutions, variables=["q_v", "p", "q_l", "T",], legend_loc="upper right"
+    solutions,
+    variables=[
+        "q_v",
+        "p",
+        "q_l",
+        "T",
+    ],
+    legend_loc="upper right",
 )
 plot.show()
 plot.draw()

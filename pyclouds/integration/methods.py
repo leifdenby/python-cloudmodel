@@ -1,28 +1,49 @@
 import sys
 import numpy as np
+from scipy.integrate import solve_ivp
 
 from .. import Var
 
 
-class NewSolver:
-    def __init__(self, dFdz, abs_tol, rel_tol, min_step):
+class ScipyIntegrator:
+    def __init__(self, dFdz, atol, rtol):
         self.dFdz = dFdz
-        self.abs_tol = abs_tol
-        self.rel_tol = rel_tol
-        self.min_step = min_step
+        self.atol = atol
+        self.rtol = rtol
         self.debug = False
 
-    def set_initial_condition(self, F0):
-        self.F0 = F0
+    def solve(self, z, F0):
+        res = solve_ivp(
+            self.dFdz,
+            t_span=[z.min(), z.max()],
+            y0=F0,
+            atol=self.atol,
+        )
 
-    def solve(self, z, stopping_func):
+        F, z = res.y, res.t
+
+        return F, z
+
+
+class NewSolver:
+    """
+    Simple Runge-Kutta 4-5 predictor-corrector integrator
+    """
+
+    def __init__(self, dFdz, atol, rtol, stopping_func):
+        self.dFdz = dFdz
+        self.atol = atol
+        self.rtol = rtol
+        self.min_step = 0.01
+        self.debug = False
+        self.min_step = 0.01
+        self.stopping_func = stopping_func
+
+    def solve(self, z, F0):
         f = self.dFdz
-        x0 = self.F0
+        x0 = F0
         a = z.min()
         b = z.max()
-        hmax = 10
-        hmin = self.min_step
-
         t = a
         x = x0
         h = 1.0
@@ -32,7 +53,11 @@ class NewSolver:
         T = np.array([t])
         X = np.array([x])
 
-        S = np.array([np.nan,])
+        S = np.array(
+            [
+                np.nan,
+            ]
+        )
 
         kk = 0
 
@@ -57,7 +82,7 @@ class NewSolver:
             if t + h > b:
                 h = b - t
 
-            if False:  # np.any(np.logical_and(x != 0.0, x < self.abs_tol)):
+            if False:  # np.any(np.logical_and(x != 0.0, x < self.atol)):
                 # do Euler forward step
                 dfdt_ = f(x, t)
                 m = np.nonzero(dfdt_)
@@ -132,10 +157,10 @@ class NewSolver:
                 print("diff")
                 Var.print_formatted(abs_err)
 
-            abs_tol = self.abs_tol
-            rel_tol = self.rel_tol
+            atol = self.atol
+            rtol = self.rtol
 
-            max_total_error = abs_tol + rel_tol * abs(x)
+            max_total_error = atol + rtol * abs(x)
             try:
                 s = (
                     0.84

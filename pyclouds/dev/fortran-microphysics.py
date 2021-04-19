@@ -30,6 +30,13 @@ sol3 = cloud_microphysics.FortranNoIceMicrophysics(constants=constants).integrat
 
 # sol2.plot()
 plot = plot_hydrometeor_evolution(
-    [sol2, sol3], variables=["q_v", "T", "q_l", "q_r", "r_c",]
+    [sol2, sol3],
+    variables=[
+        "q_v",
+        "T",
+        "q_l",
+        "q_r",
+        "r_c",
+    ],
 )
 plot.savefig("/scratch/local1/plots/microphysics.png")

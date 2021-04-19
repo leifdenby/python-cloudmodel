@@ -29,10 +29,10 @@ class CloudModel(object):
         integrator = ParcelModelIntegrator(cloud_model=self)
         return integrator(*args, **kwargs)
 
-    def dFdz(F, z):
+    def dFdz(z, F):
         raise NotImplemented
 
-    def dFdt(self, F, t):
+    def dFdt(self, t, F):
         w = F[Var.w]
         z = F[Var.z]
 
@@ -165,7 +165,7 @@ class Wagner2009(CloudModel):
 
         return r / 2.0 * ((g / (R_d * T) + 1.0 / T * dTdz_) - 1.0 / w * dwdz_ + mu / r)
 
-    def dFdz(self, F, z):
+    def dFdz(self, z, F):
         r = F[Var.r]
         w = F[Var.w]
         T = F[Var.T]
@@ -193,11 +193,11 @@ class DryAirOnly(CloudModel):
         """
         mu: entrainment rate [1/m]
         gamma: virtual mass coefficient [1]
-        D: drag coefficient [1]
+        C_D: drag coefficient [1]
         """
         self.beta = kwargs.pop("beta", 0.2)
         self.gamma = kwargs.pop("gamma", 0.5)
-        self.D = kwargs.pop("D", 0.0)
+        self.C_D = kwargs.pop("C_D", 0.0)
 
         super(DryAirOnly, self).__init__(**kwargs)
 
@@ -208,13 +208,13 @@ class DryAirOnly(CloudModel):
         """
         Also requires: environment temperature (density), so that buoyancy can be computed
         """
-        g, gamma, mu, D = self.g, self.gamma, self.mu(r), self.D
+        g, gamma, mu, C_D = self.g, self.gamma, self.mu(r), self.C_D
 
         T_e = self.environment.temp(z)
 
         B = (T - T_e) / T
 
-        return 1.0 / w * (g / (1 + gamma) * B - mu * w ** 2 - D * w ** 2 / r)
+        return 1.0 / w * (g / (1 + gamma) * B - mu * w ** 2 - C_D * w ** 2 / r)
 
     def dTdz(self, z, r, w, T):
         g, cp_d, mu = self.g, self.cp_d, self.mu(r)
@@ -228,7 +228,7 @@ class DryAirOnly(CloudModel):
 
         return r / 2.0 * ((g / (R_d * T) + 1.0 / T * dTdz_) - 1.0 / w * dwdz_ + mu)
 
-    def dFdz(self, F, z):
+    def dFdz(self, z, F):
         r = F[Var.r]
         w = F[Var.w]
         T = F[Var.T]
@@ -245,7 +245,10 @@ class DryAirOnly(CloudModel):
         return dFdz_
 
     def __str__(self):
-        return r"DryAirEqns ($D=%g$, $\beta=%g$)" % (self.D, self.beta,)
+        return r"DryAirEqns ($C_D=%g$, $\beta=%g$)" % (
+            self.C_D,
+            self.beta,
+        )
 
 
 class FullThermodynamicsCloudEquations(CloudModel):
@@ -384,7 +387,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
             cp_v: heat capacity of liquid water at constant pressure
             L_v: latent heat of vapourisation (vapour -> liquid)
             L_s: latent heat sublimation (vapour -> solid)
-            
+
         State variables:
             qd_c, qv_c, ql_c, qi_c: in-cloud dry air, water vapour, liquid water, ice
             T_c: in-cloud absolute temp
@@ -577,7 +580,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
         return f * q_r
 
-    def dFdz(self, F, z):
+    def dFdz(self, z, F):
         r = F[Var.r]
         w = F[Var.w]
         T = F[Var.T]
@@ -814,7 +817,7 @@ class FullEquationsSatMicrophysics(FullThermodynamicsCloudEquations):
             kwargs["microphysics"] = cloud_microphysics.MoistAdjustmentMicrophysics()
         super(FullEquationsSatMicrophysics, self).__init__(*args, **kwargs)
 
-    def dFdz(self, F, z):
+    def dFdz(self, z, F):
         r = F[Var.r]
         w = F[Var.w]
         T = F[Var.T]
@@ -971,7 +974,7 @@ class FixedRiseRateParcel(CloudModel):
             cp_v: heat capacity of liquid water at constant pressure
             L_v: latent heat of vapourisation (vapour -> liquid)
             L_s: latent heat sublimation (vapour -> solid)
-            
+
         State variables:
             qd_c, qv_c, ql_c, qi_c: in-cloud dry air, water vapour, liquid water, ice
             T_c: in-cloud absolute temp
@@ -1013,7 +1016,7 @@ class FixedRiseRateParcel(CloudModel):
             + L_s / c_cm_p * dqi_c__dz
         )
 
-    def dFdz(self, F, z):
+    def dFdz(self, z, F):
         r = F[Var.r]
         w = F[Var.w]
         T = F[Var.T]

@@ -332,7 +332,10 @@ class LayeredStable(LayeredDryAtmosphere):
 
         layers = []
         layers.append(
-            {"z_max": 2.0e3, "dTdz": dTdz + 1.0e-3,}
+            {
+                "z_max": 2.0e3,
+                "dTdz": dTdz + 1.0e-3,
+            }
         )
         layers.append({"z_max": np.finfo("f").max, "dTdz": dTdz + 5.0e-3})
         super(LayeredStable, self).__init__(layers=layers, rho0=rho0, p0=p0)
@@ -492,16 +495,27 @@ class Soong1973Dry(LayeredDryAtmosphere):
         layer_thickness_0 = 800.0  # m
 
         layers.append(
-            {"z_max": 800.0, "dTdz": dTdz_dry,}
+            {
+                "z_max": 800.0,
+                "dTdz": dTdz_dry,
+            }
         )
         layers.append(
-            {"z_max": 12800.0, "dTdz": dTdz_moist,}
+            {
+                "z_max": 12800.0,
+                "dTdz": dTdz_moist,
+            }
         )
         layers.append(
-            {"z_max": np.finfo("f").max, "dTdz": 0.0,}
+            {
+                "z_max": np.finfo("f").max,
+                "dTdz": 0.0,
+            }
         )
 
-        super(Soong1973Dry, self).__init__(layers=layers,)
+        super(Soong1973Dry, self).__init__(
+            layers=layers,
+        )
 
     def __str__(self):
         return "Soong 1973 layered dry atmosphere"
@@ -588,7 +602,7 @@ class RICO:
         self._create_profile()
 
     def _create_profile(self):
-        """ Create a vertical profile that we can interpolate into later. 
+        """Create a vertical profile that we can interpolate into later.
         Integrating with the hydrostatic assumption.
         """
         from pyclouds import parameterisations
@@ -749,7 +763,7 @@ class RICO:
     def ddt_theta_l__ls(z):
         """
         Large Scale Horizontal Liq. Water Pot. Temperature Advection combined
-        with Radiative Cooling [K/s] 
+        with Radiative Cooling [K/s]
 
         NB: Initial profile contains no liquid water so `temp = pot. temp`
         """

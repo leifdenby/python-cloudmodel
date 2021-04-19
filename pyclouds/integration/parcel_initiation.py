@@ -73,25 +73,25 @@ def original_CCFM_cloudbase(environment, dqv=0.0, dT=0.0):
       q_c = q_e(level)
 
       base: do l = level-1, 2 ,-1
-            
+
          ! dry adiabatic ascent
          T_c =  ( cpd * T_c + geo(l+1) - geo(l) ) / cpd
          q_old = q_c
 
          ! adjustmend for moist ascent
          call moist_adjust( T_c, q_c, prs(l) )
-     
+
          ! if condensation occurred
          if ( q_c < q_old ) cond = .true.
 
          buo =   T_c    * ( 1._dp + epsi * q_c )     &
                - T_e(l) * ( 1._dp + epsi * q_e(l) )
-        
+
          if ( cond .and. (buo >= - basebuo) ) then
              cl_base = l
              exit
          end if
-            
+
          if ( cond .and. (buo <= -(basebuo + 0.2_dp)) ) then
             exit
          endif

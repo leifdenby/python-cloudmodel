@@ -39,7 +39,9 @@ class HydrometeorEvolution:
 
     def plot(self):
         parcel_plots.plot_hydrometeor_evolution(
-            [self,]
+            [
+                self,
+            ]
         )
 
     def __str__(self):
@@ -62,8 +64,8 @@ class BaseMicrophysicsModel(object):
             warnings.warn("`model_constraint` not provided, assuming isometric")
         self.model_constraint = kwargs.get("model_constraint", "isometric")
 
-        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(
-            constants=constants
+        self.parameterisations = (
+            parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         )
         self.constants = AttrDict(constants)
 
@@ -87,9 +89,17 @@ class BaseMicrophysicsModel(object):
 
         if stopping_criterion is None:
             stopping_criterion = self._stopping_criterion
-        F, t = solver.solve(t, stopping_criterion,)
+        F, t = solver.solve(
+            t,
+            stopping_criterion,
+        )
 
-        return HydrometeorEvolution(F=F, t=t, model=self, extra_vars=self.extra_vars,)
+        return HydrometeorEvolution(
+            F=F,
+            t=t,
+            model=self,
+            extra_vars=self.extra_vars,
+        )
 
     def __call__(self, F, dt):
         return self.dFdt(F=F) * dt
@@ -131,7 +141,12 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
             F[1:] = F_adjusted
 
         return HydrometeorEvolution(
-            F=F, t=t, model=self, integration_kwargs={"iterations": iterations,}
+            F=F,
+            t=t,
+            model=self,
+            integration_kwargs={
+                "iterations": iterations,
+            },
         )
 
     def dFdt(self, *args, **kwargs):
@@ -669,8 +684,8 @@ class FortranNoIceMicrophysics(BaseMicrophysicsModel):
 
         constants = um_constants
 
-        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(
-            constants=constants
+        self.parameterisations = (
+            parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         )
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
@@ -715,8 +730,8 @@ class ExplicitFortranModel:
 
         unified_microphysics.microphysics_pylib.init("no_ice", model_constraint)
 
-        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(
-            constants=constants
+        self.parameterisations = (
+            parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         )
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
@@ -745,7 +760,11 @@ class ExplicitFortranModel:
                 print("(%s): Integration stopped, %s" % (str(self), str(e)))
                 break
 
-        return HydrometeorEvolution(F=np.array(F), t=np.array(t_), model=self,)
+        return HydrometeorEvolution(
+            F=np.array(F),
+            t=np.array(t_),
+            model=self,
+        )
 
     def __str__(self):
         return "fortran-only `no_ice` with rkf34 (%s)" % self.model_constraint
@@ -772,8 +791,8 @@ class OldATHAMKesslerFortran:
 
         unified_microphysics.microphysics_pylib.init("kessler_old", model_constraint)
 
-        self.parameterisations = parameterisations.ParametersationsWithSpecificConstants(
-            constants=constants
+        self.parameterisations = (
+            parameterisations.ParametersationsWithSpecificConstants(constants=constants)
         )
         self.qv_sat = self.parameterisations.pv_sat.qv_sat
 
@@ -810,7 +829,11 @@ class OldATHAMKesslerFortran:
                 raise
                 break
 
-        return HydrometeorEvolution(F=np.array(F), t=np.array(t_), model=self,)
+        return HydrometeorEvolution(
+            F=np.array(F),
+            t=np.array(t_),
+            model=self,
+        )
 
     def __str__(self):
         return 'old ATHAM "Kessler microphysics" (isometric)'

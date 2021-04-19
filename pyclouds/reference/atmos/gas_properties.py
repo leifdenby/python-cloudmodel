@@ -4,13 +4,13 @@ import scipy.constants
 
 class IdealGas(object):
     """
-        Class for describing general ideal gas.
+    Class for describing general ideal gas.
     """
 
     def __init__(self, f, M):
         """
-            f: degrees of freedom
-            M: molar weight (g/mol)
+        f: degrees of freedom
+        M: molar weight (g/mol)
         """
         self.f = f
         self.M = M

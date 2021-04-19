@@ -119,9 +119,9 @@ def test__entrainment():
         environment=environment, gamma=0.0, D=0.0, beta=0.2, microphysics=microphysics
     )
 
-    dFdz1 = cloud_model_no_entrainment.dFdz(initial_condition, 0.0)
-    dFdz2 = cloud_model_with_entrainment.dFdz(initial_condition, 0.0)
-    dFdz_dry = cloud_model_with_entrainment.dFdz(initial_condition, 0.0)
+    dFdz1 = cloud_model_no_entrainment.dFdz(z=0.0, F=initial_condition)
+    dFdz2 = cloud_model_with_entrainment.dFdz(z=0.0, F=initial_condition)
+    dFdz_dry = cloud_model_with_entrainment.dFdz(z=0.0, F=initial_condition)
 
     # although only dry air is being entrained the effect of entrainment will
     # change the temperature as the entrained air will be cooler

@@ -44,7 +44,12 @@ for dt in [t_max / 50, t_max / 100, t_max / 200]:
         )
 
         plot_hydrometeor_evolution(
-            solutions, variables=["q_l", "T",], legend_loc="upper right"
+            solutions,
+            variables=[
+                "q_l",
+                "T",
+            ],
+            legend_loc="upper right",
         )
 
         L_v = um_constants.get("L_v")

@@ -360,7 +360,11 @@ def plot_profiles(
                         profile_data = np.array(profile_data) / 1000.0
 
                     profile_line = plot.plot(
-                        profile_data, z, label=label, marker=".", linestyle="",
+                        profile_data,
+                        z,
+                        label=label,
+                        marker=".",
+                        linestyle="",
                     )
 
                     if n == 0:
@@ -546,7 +550,9 @@ def plot_profiles(
 
 def plot_hydrometeor_evolution(
     evolutions,
-    variables=["q_v",],
+    variables=[
+        "q_v",
+    ],
     legend_loc="lower right",
     initial_condition=None,
     fig=None,
@@ -639,8 +645,10 @@ def plot_hydrometeor_evolution(
                 if hasattr(evolution.model, "qv_sat"):
                     q_v__sat = evolution.model.qv_sat(T=T, p=p)
                 elif hasattr(evolution.model, "constants"):
-                    model_parameterisations = parameterisations.ParametersationsWithSpecificConstants(
-                        constants=evolution.model.constants
+                    model_parameterisations = (
+                        parameterisations.ParametersationsWithSpecificConstants(
+                            constants=evolution.model.constants
+                        )
                     )
                     q_v__sat = model_parameterisations.pv_sat.qv_sat(T=T, p=p)
                 else:
@@ -689,7 +697,14 @@ def plot_hydrometeor_evolution(
 
     title = "Hydrometeor evolution"
     if initial_condition is not None:
-        title += "\n" + Var.repr(initial_condition, skip=["r", "w", "z",])
+        title += "\n" + Var.repr(
+            initial_condition,
+            skip=[
+                "r",
+                "w",
+                "z",
+            ],
+        )
 
     if global_legend:
         if labels is None:
