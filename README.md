@@ -1,9 +1,11 @@
 # Python 1D cloud-model
 
-This library is being developed as a tool to implement and investigate new 1D
-cloud-models, with particular emphasis on improving the cloud model in CCFM
-([Convective Cloud Field Model - Nober & Graf
+This library is being developed as a tool to implement and investigate new
+1D cloud-models, with particular emphasis on improving the cloud model in
+CCFM ([Convective Cloud Field Model - Nober & Graf
 2005](http://www.atmos-chem-phys.net/5/2749/2005/acp-5-2749-2005.html)).
+Derivation of the cloud equations can be found in [L Denby
+2017](https://www.repository.cam.ac.uk/handle/1810/269850).
 
 Each model is based around a set of conservation equations describing the
 vertical change in in-cloud variables in a convective cloud in the mature state.
