@@ -66,3 +66,9 @@ class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
+
+
+from ._version import get_versions
+
+__version__ = get_versions()["version"]
+del get_versions

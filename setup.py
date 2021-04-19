@@ -5,6 +5,7 @@ import sysconfig
 import platform
 import subprocess
 
+import versioneer
 from distutils.version import LooseVersion
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
@@ -22,9 +23,13 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 
+cmdclass = versioneer.get_cmdclass()
+# add custom build_ext command
+cmdclass["test"] = PyTest
+
 setup(
     name="pyclouds",
-    version="0.1.1",
+    version=versioneer.get_version(),
     author="Leif Denby",
     author_email="l.c.denby@leeds.ac.uk",
     description="Cloud model and thermodynamics",
@@ -32,7 +37,6 @@ setup(
     zip_safe=False,
     install_requires=open("requirements.txt").readlines(),
     packages=["pyclouds", "pyclouds.ccfm", "pyclouds.ccfm.ccfmpython"],
-    # add custom build_ext command
-    cmdclass=dict(test=PyTest),
+    cmdclass=cmdclass,
     tests_require=["pytest"],
 )
