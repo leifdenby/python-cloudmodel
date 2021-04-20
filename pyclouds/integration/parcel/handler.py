@@ -4,7 +4,7 @@ import warnings
 
 from ... import Var
 from .. import methods as integration_methods
-from ...plots import parcel as parcel_plots
+from ...plot import parcel as parcel_plots
 from .stopping import DEFAULT_STOPPING_FUNCTIONS
 
 
@@ -73,7 +73,10 @@ class ParcelModelIntegrator(object):
         F, z, stopping_reason = solver.solve(z=z, F0=initial_condition)
 
         return ParcelEvolution(
-            F=F, z=z, cloud_model=self, integration_stopping_reason=stopping_reason
+            F=F,
+            z=z,
+            cloud_model=self.cloud_model,
+            integration_stopping_reason=stopping_reason,
         )
 
     def dFdt(self, F, t):

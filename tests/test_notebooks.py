@@ -42,8 +42,5 @@ def test_notebook(notebook_filename, html_directory="notebook-html"):
 
     ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
 
-    try:
-        # Check that the notebook runs
-        ep.preprocess(nb, {"metadata": {"path": ""}})
-    except CellExecutionError:
-        raise
+    # Check that the notebook runs
+    ep.preprocess(nb, {"metadata": {"path": ""}})
