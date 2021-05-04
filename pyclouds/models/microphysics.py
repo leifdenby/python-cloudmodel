@@ -62,7 +62,8 @@ class BaseMicrophysicsModel(object):
 
         if model_constraint is None:
             warnings.warn("`model_constraint` not provided, assuming isometric")
-            self.model_constraint = "isometric"
+            model_constraint = "isometric"
+        self.model_constraint = model_constraint
 
         self.parameterisations = (
             parameterisations.ParametersationsWithSpecificConstants(constants=constants)
