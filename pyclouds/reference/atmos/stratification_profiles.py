@@ -5,6 +5,8 @@ import scipy.optimize
 import scipy.interpolate
 
 from . import gas_properties as ref_gas_properties
+from ..constants import default_constants
+from .. import parameterisations
 
 
 def getStandardIsothermalAtmosphere():
@@ -571,8 +573,6 @@ class RICO:
     """
 
     def __init__(self, include_wind=False):
-        from pyclouds import parameterisations
-
         self.include_wind = include_wind
         if include_wind:
             self.u_wind = self._u_wind
@@ -594,8 +594,8 @@ class RICO:
 
         # XXX: R_v and cp_v are not given in the RICO test definition on the
         # the KNMI site I will use what I believe are standard values here
-        self.R_v = parameterisations.common.default_constants.get("R_v")
-        self.cp_v = parameterisations.common.default_constants.get("cp_v")
+        self.R_v = default_constants.get("R_v")
+        self.cp_v = default_constants.get("cp_v")
 
         self.z_max = 4e3
 
@@ -605,8 +605,6 @@ class RICO:
         """Create a vertical profile that we can interpolate into later.
         Integrating with the hydrostatic assumption.
         """
-        from pyclouds import parameterisations
-
         parameterisation = parameterisations.SaturationVapourPressure()
 
         dz = 100.0
@@ -709,8 +707,6 @@ class RICO:
         q_v = self.q_t(z)
         p = self.p(z)
         T = self.temp(z)
-
-        from pyclouds import parameterisations
 
         parameterisation = parameterisations.SaturationVapourPressure()
 
@@ -976,8 +972,6 @@ class TwoLayerMoistIsentropicPBL:
         # )
 
     def __init_profile(self, p_min):
-        from pyclouds import parameterisations
-
         qv_sat__f = parameterisations.ParametersationsWithSpecificConstants(
             self.constants
         ).pv_sat.qv_sat
@@ -1023,8 +1017,6 @@ class TwoLayerMoistIsentropicPBL:
             self._z = np.array(z)
 
     def qv_sat(self, z):
-        from pyclouds import parameterisations
-
         T = self.temp(z)
         p = self.p(z)
         return parameterisations.ParametersationsWithSpecificConstants(

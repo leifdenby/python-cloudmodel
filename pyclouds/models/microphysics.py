@@ -13,7 +13,7 @@ from ..reference.constants import (
 )
 from ..reference import parameterisations
 from ..integration import methods as integration_methods
-from ..plots import parcel as parcel_plots
+from ..plot import parcel as parcel_plots
 
 try:
     import unified_microphysics.fortran as unified_microphysics
@@ -57,12 +57,13 @@ class HydrometeorEvolution:
 
 
 class BaseMicrophysicsModel(object):
-    def __init__(self, constants=default_constants, *args, **kwargs):
+    def __init__(self, constants=default_constants, model_constraint=None):
         constants = make_related_constants(constants)
 
-        if not "model_constraint" in kwargs:
+        if model_constraint is None:
             warnings.warn("`model_constraint` not provided, assuming isometric")
-        self.model_constraint = kwargs.get("model_constraint", "isometric")
+            model_constraint = "isometric"
+        self.model_constraint = model_constraint
 
         self.parameterisations = (
             parameterisations.ParametersationsWithSpecificConstants(constants=constants)
@@ -227,13 +228,21 @@ class MoistAdjustmentMicrophysics(BaseMicrophysicsModel):
 
 
 class FiniteCondensationTimeMicrophysics(BaseMicrophysicsModel):
-    def __init__(self, *args, **kwargs):
-        super(FiniteCondensationTimeMicrophysics, self).__init__(*args, **kwargs)
+    def __init__(
+        self,
+        constants=default_constants,
+        model_constraint=None,
+        disable_rain=False,
+        disable_rain_condevap=False,
+    ):
+        super(FiniteCondensationTimeMicrophysics, self).__init__(
+            constants=constants, model_constraint=model_constraint
+        )
         self.N0 = 200 * 1.0e6  # initial aerosol number concentration [m-3]
         self.r0 = 0.1e-6  # cloud droplet initial radius
         self.debug = True
-        self.disable_rain = kwargs.get("disable_rain", False)
-        self.disable_rain_condevap = kwargs.get("disable_rain_condevap", False)
+        self.disable_rain = disable_rain
+        self.disable_rain_condevap = disable_rain_condevap
 
     def integrate(self, *args, **kwargs):
         evolution = super(FiniteCondensationTimeMicrophysics, self).integrate(

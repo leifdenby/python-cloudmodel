@@ -30,7 +30,7 @@ class ScipyIntegrator:
             events=self.stopping_functions,
         )
 
-        F, z = res.y, res.t
+        F, z = res.y.T, res.t
 
         if res.status == 0:
             return F, z, None
@@ -52,7 +52,8 @@ class ScipyIntegrator:
 
             return F, z, stopping_reason
         else:
-            raise Exception
+            stopping_reason = res.message
+            return F, z, stopping_reason
 
 
 class NewSolver:
