@@ -25,9 +25,24 @@ class CloudModel(object):
 
         self.extra_vars = {}
 
-    def integrate(self, *args, **kwargs):
+    def integrate(
+        self,
+        initial_condition,
+        z,
+        stopping_criterion=None,
+        tolerance=1e-3,
+        fail_on_nan=False,
+        method="RK45",
+    ):
         integrator = ParcelModelIntegrator(cloud_model=self)
-        return integrator(*args, **kwargs)
+        return integrator(
+            initial_condition=initial_condition,
+            z=z,
+            stopping_criterion=stopping_criterion,
+            tolerance=tolerance,
+            fail_on_nan=fail_on_nan,
+            method=method,
+        )
 
     def dFdz(z, F):
         raise NotImplemented
@@ -264,7 +279,14 @@ class FullThermodynamicsCloudEquations(CloudModel):
     """
 
     def __init__(
-        self, environment, gamma=0.5, C_D=0.506, beta=0.2, l_pr=100.0, **kwargs
+        self,
+        environment,
+        microphysics,
+        gamma=0.5,
+        C_D=0.506,
+        beta=0.2,
+        l_pr=100.0,
+        **kwargs
     ):
         """
         gamma: virtual mass coefficient
@@ -286,7 +308,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
             "temperature_dependent_latent_heats", True
         )
         super(FullThermodynamicsCloudEquations, self).__init__(
-            environment=environment, **kwargs
+            environment=environment, microphysics=microphysics, **kwargs
         )
 
         if self.entrain_moist_static_energy and self.entrain_liquid_static_energy:
@@ -785,7 +807,7 @@ class FullThermodynamicsCloudEquations(CloudModel):
 
     def __str__(self):
         model_desc = (
-            r"FullSpecConcEqns ($C_D=%g$, $\beta=%g$, $l_{pr}=%s$), mu-phys: %s"
+            r"FullSpecConcEqns ($C_D=%g$, $\beta=%g$, $l_{pr}=%s$), $\mu$-phys: %s"
             % (
                 self.C_D,
                 self.beta,
@@ -1048,6 +1070,6 @@ class FixedRiseRateParcel(CloudModel):
         return dFdz_
 
     def __str__(self):
-        return r"Fixed vertical velocity: w0={w0}m/s, mu-phys: {mphys}".format(
+        return r"Fixed vertical velocity: w0={w0}m/s, $\mu$-phys: {mphys}".format(
             w0=self.w0, mphys=self.microphysics
         )
