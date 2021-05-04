@@ -25,9 +25,24 @@ class CloudModel(object):
 
         self.extra_vars = {}
 
-    def integrate(self, *args, **kwargs):
+    def integrate(
+        self,
+        initial_condition,
+        z,
+        stopping_criterion=None,
+        tolerance=1e-3,
+        fail_on_nan=False,
+        method="RK45",
+    ):
         integrator = ParcelModelIntegrator(cloud_model=self)
-        return integrator(*args, **kwargs)
+        return integrator(
+            initial_condition=initial_condition,
+            z=z,
+            stopping_criterion=stopping_criterion,
+            tolerance=tolerance,
+            fail_on_nan=fail_on_nan,
+            method=method,
+        )
 
     def dFdz(z, F):
         raise NotImplemented
