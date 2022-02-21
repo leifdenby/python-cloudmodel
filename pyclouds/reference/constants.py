@@ -83,7 +83,7 @@ ATHAM_constants = {
 
 UCLALES_constants = {
     "cp_d": 1005.0,
-    "R_d": 187.04,
+    "R_d": 287.04,
     "L_v": 2500000.0,
     "cp_l": 4183.0,
     "cp_i": 2103.0,
