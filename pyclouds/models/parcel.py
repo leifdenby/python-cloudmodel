@@ -626,6 +626,9 @@ class FullThermodynamicsCloudEquations(CloudModel):
         rho_c = self.cloud_mixture_density(
             p=p, T_c=T, qd_c=q_d, qv_c=q_v, ql_c=q_l, qi_c=q_i, qr_c=q_r
         )
+        # some of the rho_c values produced here are nan or even negative in a few cases. 
+        # found this by adding a print statement for rho_c here and then running the model (in the moist integration notebook for example). 
+        
         g = self.constants.g
         B = (rho_e - rho_c) / rho_e
         mu = self._mu(r=r, w=w, B=B, z=z)
